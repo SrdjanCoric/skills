@@ -49,9 +49,12 @@ This is what separates human writing from the obviously generated kind. Hunt for
 
 - **Over-scaffolding and meta-commentary.** Text that announces what it's about to do instead of doing it. Several faces of the same problem:
   - Pre-announcing: "Before we get into it...", "Let's take a moment to...", "Here's where it gets interesting," "Here's the key insight," "This is the part that matters." A sentence whose only job is to hype the next sentence can be deleted; the point lands fine on its own.
+  - **Announcing candor**: "Let's be honest:", "To be honest,", "Frankly,", "To be fair,", "The honest version:", "stated up front:", "We'll be honest about where this fits." The voice rules demand honesty about trade-offs, and the model satisfies that by *announcing* honesty instead of delivering it, so this tell shows up precisely where you tried to be candid. Cut the preface and state the limitation plainly; the candor is in the content, not the label.
   - The **bare pointer sentence** that promises an explanation instead of giving it: "Here's why.", "Here's the thing.", "Here's the catch.", "The best part?" Delete it and let the next sentence deliver the reason directly.
   - The **example-announcing entrance**: "A concrete case makes this clearer.", "Here's what that looks like in practice." Cut it and go straight into the example; the clarification arrives when it does.
-  - **Self-labeling the payload with a colon**: "what really sets it apart is this: speed," "here's what matters most: you ship faster." The label rates the content instead of stating it. Drop the label and the colon: "It's faster." A close cousin is the **cataphoric placeholder**, a dummy word standing in for the real noun to delay it for a beat of false suspense: "it all comes down to one thing: latency." Name the thing directly: "it all comes down to latency."
+  - **Self-labeling the payload with a colon**: "what really sets it apart is this: speed," "here's what matters most: you ship faster." The label rates the content instead of stating it. Drop the label and the colon: "It's faster." A close cousin is the **cataphoric placeholder**, a dummy word standing in for the real noun to delay it for a beat of false suspense: "it all comes down to one thing: latency." Name the thing directly: "it all comes down to latency." The label can also rate a rule or fact instead of revealing it: "The rule is absolute: no secrets in prompts," "This distinction is critical: ...". Drop the rating and state the rule; if it doesn't sound binding without the adjective, the rule was weak, not the sentence.
+
+- **Dramatic staging.** Prose arranged as narrative beats instead of statements. The tells: the one-beat suspense reveal ("This is that moment.", "Enter the orchestrator.", "That's where X comes in."), narrating the shape of your own text ("We started with the big picture; now we zoom in"), and returning to a framing image to stage a moment after it already did its explanatory work. A metaphor that explains something stays; theater around the structure goes. Say what the thing is or does and move on.
 
 - **The "not X, but Y" antithesis.** A negation set against a reframed positive for cadence: "this isn't about speed, it's about peace of mind," "the goal isn't more features, it's fewer headaches." The shape sounds wise but it's a rhythm template the model reaches for by reflex, and stacking two or three is a dead giveaway. State the positive directly and drop the strawman: "It gives you back an hour a day." One genuine contrast for real emphasis is fine; a parade of them is not. A close cousin is the **transformation reframe**: "X stops being A and becomes B," "your inbox is no longer a chore, it's a command center." State the before/after plainly without the stop-being/become scaffolding.
 
@@ -67,18 +70,21 @@ This is what separates human writing from the obviously generated kind. Hunt for
 
 - **Definitional and category openers.** Don't open by defining yourself in jargon ("X is a cloud-native, AI-powered platform that..."). Lead with what it does for the reader: "X turns your messy CSVs into a clean API in one upload."
 
-## Self-review pass
+## The audit pass
 
-Before delivering, read every sentence as if out loud, then run the checklist:
+Knowing these rules while drafting does not prevent the tells; they surface anyway, in the very passages where you applied a voice rule (be honest, be punchy, lead with the claim). So the review is a **separate, adversarial pass over the finished draft**, not a check you run while writing. Treat the draft as someone else's text you've been asked to audit: go sentence by sentence, and for each hit, quote it and fix it. Several of these tells (the "worth"-family, announcing candor, the antithesis) reliably creep back into the *fixed* text, so audit your fixes too.
+
+Run the checklist over the whole document, not paragraph by paragraph; some tells only show at document scale:
 
 1. **Em dashes:** none anywhere.
 2. **Filler words and the full "worth [verb-ing]" family:** gone, including any that crept back in. Also the "different beast" pivot and the difficulty-rating tic.
-3. **Rhythm:** no run of choppy fragments, no overloaded run-ons, no tricolons, no synonym pairs, no stacked-parallel or question-then-answer patterns.
-4. **Scaffolding:** no sentence whose only job is to announce the next one; no bare pointer ("Here's why."), example-announcer, self-labeling colon, or cataphoric placeholder; no definitional or category opener; no closing flourish.
-5. **Antithesis and reframes:** no parade of "not X, but Y" or "X stops being A and becomes B"; at most one genuine contrast for emphasis.
-6. **Inflation:** no false precision (exactly/perfectly/one-to-one), no puffed-up significance ("naturally," "the key to everything"), no neat-button closer, no coverage-reassurance repeated.
-7. **Redundancy:** run the paraphrase-collapse test; cut any sentence that only re-says a prior one.
-8. **Concreteness:** every claim names a real outcome, number, or behavior, and every fact is verified or placeholdered.
-9. **Voice:** sounds like one person talking to one reader, with contractions and a clear point of view.
+3. **Rhythm:** no run of choppy fragments (including fragment openers like "Early, and built in public."), no overloaded run-ons, no tricolons, no synonym pairs, no stacked-parallel or question-then-answer patterns.
+4. **Scaffolding:** no sentence whose only job is to announce the next one; no bare pointer ("Here's why."), example-announcer ("It works like this."), announcing-candor preface ("Let's be honest:"), self-labeling colon, rating-label ("The rule is absolute:"), or cataphoric placeholder; no definitional or category opener; no closing flourish.
+5. **Staging:** no one-beat reveals ("That's where X comes in."), no narrating the text's own structure, no framing image milked past its first use.
+6. **Antithesis and reframes:** count every "not X, but Y" and "X stops being A and becomes B" across the *entire document*; at most one genuine contrast survives, and it should be the most load-bearing one.
+7. **Inflation:** no false precision (exactly/perfectly/one-to-one), no puffed-up significance ("naturally," "the key to everything"), no neat-button closer, no coverage-reassurance repeated.
+8. **Redundancy:** run the paraphrase-collapse test; cut any sentence that only re-says a prior one. Also cut reasoning re-attached to a point the reader already has; once the why has landed, later mentions get the directive alone.
+9. **Concreteness:** every claim names a real outcome, number, or behavior, and every fact is verified or placeholdered.
+10. **Voice:** sounds like one person talking to one reader, with contractions and a clear point of view.
 
 If a line survives the whole checklist and still sounds like marketing copy, rewrite it once more the way you'd actually say it, and cut whatever was only there for polish.
