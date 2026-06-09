@@ -10,6 +10,12 @@ npx skills@latest add SrdjanCoric/skills
 
 The installer lists every skill in the repo and lets you pick which ones to install. Run it again later to pull updates.
 
+To install a single skill directly:
+
+```bash
+npx skills@latest add SrdjanCoric/skills --skill write-well
+```
+
 ## Skills
 
 - **hash-it-out**: Interviews you about a plan, design, or idea, one question at a time, until you've reached shared understanding. Walks down each branch of the decision tree and saves the final decisions to a file.
