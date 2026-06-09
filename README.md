@@ -12,4 +12,5 @@ The installer lists every skill in the repo and lets you pick which ones to inst
 
 ## Skills
 
-Skills will be listed here as they're added, each with a short description of what it does.
+- **hash-it-out**: Interviews you about a plan, design, or idea, one question at a time, until you've reached shared understanding. Walks down each branch of the decision tree and saves the final decisions to a file.
+- **write-well**: Writes and revises prose in a direct, human voice. Enforces a strict checklist for stripping the tells that make text read as machine-generated.
