@@ -9,19 +9,6 @@ Implement the **next uncompleted feature** of the plan in full on its own featur
 open a PR once the user approves. The plan is the source of truth for what to build and what is
 already done.
 
-> The pre-delegation version of this skill is preserved verbatim at
-> `original-pre-delegation-2026-06-12.md` in this folder; it is a resource file, not a loaded
-> skill, so it never registers as a second command.
-
-## Delegation principle
-
-Keep the main agent's context small: delegate read-only reconnaissance to subagents, and only
-ever delegate work that comes back as accurate as doing it yourself. Whole-plan reading and
-disk/git verification are delegated (steps 1 and 2). What stays in the main agent: the
-**verbatim** text of the active phase and the global conventions, every judgment call, the TDD
-implementation, and any file you are about to edit (editing needs exact content). When you
-delegate, the subagent must return the load-bearing parts **verbatim**, never summarized.
-
 ## Argument
 
 A single argument: the path to the plan file (e.g. `plans/job-tracker-plan.md`). If no argument
@@ -31,28 +18,15 @@ which plan to use before doing anything else.
 
 ## Workflow
 
-1. **Map the plan via a subagent (keep main context small).** Spawn one `Explore` (or
-   `general-purpose`) subagent to read the entire plan file end to end and return, in one
-   structured result: (a) the global ground rules, working conventions, and architectural
-   decisions **verbatim**; (b) the **first phase that still has unchecked `- [ ]` tasks**,
-   reproduced **verbatim in full** — its `**Branch**` field, every task with its
-   AFK/`[decision]`/`[verify]` marker, and any phase-specific notes; (c) the paths of any
-   decision docs that phase references; (d) a one-paragraph digest of the remaining phases and
-   the implementation log, enough to know what is already done and to avoid pulling later work
-   forward. You implement against the verbatim active phase and conventions, so nothing
-   load-bearing is summarized away, and the other phases never enter main context. Read a
-   referenced decision doc directly only when a task depends on it.
+1. **Read the plan in full.** Read the entire plan file end to end — workflow ground rules,
+   architectural decisions, every phase, and the implementation log. Do not skim.
 
-2. **Verify reality via a subagent.** Spawn an `Explore` subagent to check the plan's
-   implementation-log claims for the active phase against git history and the actual files on
-   disk, returning a short **drift report**: what the log says is done versus what the code
-   shows, the paths of the files the phase touches, and the current branch and HEAD. The log
-   can be stale or wrong; trust the code over the log. When you implement, read the specific
-   files you will edit directly — editing needs exact content, so that part is never delegated.
+2. **Establish what already exists.** Read the plan's implementation log, then *verify against
+   reality* — check git history and the actual files on disk. The log can be stale or wrong;
+   trust the code over the log. Note any drift.
 
-3. **Pick the next feature.** Confirm the active phase the mapping step surfaced (the first
-   phase with any unchecked `- [ ]` tasks). State clearly which feature you are implementing
-   before you start.
+3. **Pick the next feature.** The next feature is the first phase with any unchecked tasks
+   (`- [ ]`). State clearly which feature you are implementing before you start.
 
 4. **Create or check out the feature branch.** The branch name comes from the phase's
    `**Branch**` field. If the branch already exists (locally or on the remote), check it out and
@@ -101,7 +75,4 @@ so the user gets it on their phone via Remote Control. Then wait for their respo
 - Bias hard toward AFK; interrupt the user only for `[decision]`, `[verify]`, and PR approval.
 - Batch human input where possible (one notification per pause, not one per item).
 - Verify what's done against the code, not just the log.
-- Delegate read-only reconnaissance (whole-plan reading, disk/git verification) to subagents to
-  keep main context small; keep judgment, the verbatim active phase, the TDD implementation, and
-  any file you edit in the main agent. Delegate only what returns as accurate as doing it yourself.
 - Update the plan before finishing; PR only via createpr, only after approval.
