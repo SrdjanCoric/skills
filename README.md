@@ -29,3 +29,4 @@ The first five work as a pipeline: talk through an idea, turn the decisions into
 - **sync-main**: Checks out the main branch and pulls the latest changes, warning you first if uncommitted work would be overwritten.
 - **create-pr**: Commits and pushes the current changes if needed, then opens a PR with a structured, auto-generated description (overview plus per-file key changes).
 - **tdd**: Builds features and fixes bugs test-first with a red-green-refactor loop. Ships with reference notes on writing tests, mocking, refactoring, and module design.
+- **handoff**: Captures a focused slice of the current work (a bug, a new task, some context) into a handoff document a fresh agent can pick up without re-deriving everything.
