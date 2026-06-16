@@ -30,3 +30,4 @@ The first five work as a pipeline: talk through an idea, turn the decisions into
 - **create-pr**: Commits and pushes the current changes if needed, then opens a PR with a structured, auto-generated description (overview plus per-file key changes).
 - **tdd**: Builds features and fixes bugs test-first with a red-green-refactor loop. Ships with reference notes on writing tests, mocking, refactoring, and module design.
 - **handoff**: Captures a focused slice of the current work (a bug, a new task, some context) into a handoff document a fresh agent can pick up without re-deriving everything.
+- **diagnose**: Works hard bugs and performance regressions through a disciplined loop: build a feedback loop, reproduce, minimize, hypothesize, instrument, fix, then add a regression test.
