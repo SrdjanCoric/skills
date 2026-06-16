@@ -75,14 +75,22 @@ which plan to use before doing anything else.
 7. **Verify your own work.** Run the relevant tests/checks for everything you built and confirm
    they pass. Report failures honestly with output; never bend tests to pass.
 
-8. **Request manual `[verify]` checks.** Once all AFK work is done and green, present every
-   `[verify]` task to the user in one batch — what to check and how. Send a push notification,
-   then wait. If verification fails, fix and re-request.
+8. **Run the feature review (AFK).** Once all AFK work is done and green, invoke the
+   **`feature-review`** skill with `base=main` and `spec=` the **verbatim active plan phase plus
+   its referenced decision docs**. It fans out a review panel — Standards, Spec, `/code-review`,
+   and `/security-review` when the diff touches security-relevant code — and writes
+   `reviews/<featureName>-review.md`. This runs fully AFK; never pause for its findings.
 
-9. **Update the plan.** Check off all completed tasks (`- [x]`), record what was built, key file
-   paths, and every decision made via talk-it-through. Leave the plan an accurate source of truth.
+9. **Request manual `[verify]` checks and review read.** Present every `[verify]` task to the user
+   in one batch — what to check and how — **and point them at `reviews/<featureName>-review.md` to
+   read**. Send a single push notification covering both, then wait. If verification fails or the
+   review surfaces something worth fixing, fix on this branch and re-request (re-running the review
+   overwrites the file).
 
-10. **Get approval, then open the PR.** When everything is finished — AFK tasks done, tests
+10. **Update the plan.** Check off all completed tasks (`- [x]`), record what was built, key file
+    paths, and every decision made via talk-it-through. Leave the plan an accurate source of truth.
+
+11. **Get approval, then open the PR.** When everything is finished — AFK tasks done, tests
     green, manual verifications confirmed, plan updated — ask the user to approve opening the
     PR. Send a push notification. Only after explicit approval, invoke the **createpr** skill
     to commit the work and open the PR from the feature branch. Never open the PR before
