@@ -75,17 +75,23 @@ which plan to use before doing anything else.
 7. **Verify your own work.** Run the relevant tests/checks for everything you built and confirm
    they pass. Report failures honestly with output; never bend tests to pass.
 
-8. **Run the feature review (AFK).** Once all AFK work is done and green, invoke the
-   **`feature-review`** skill with `base=main` and `spec=` the **verbatim active plan phase plus
-   its referenced decision docs**. It fans out a review panel — Standards, Spec, `/code-review`,
-   and `/security-review` when the diff touches security-relevant code — and writes
-   `reviews/<featureName>-review.md`. This runs fully AFK; never pause for its findings.
+8. **Generate the feature review (AFK), then stop — do not act on it.** Once all AFK work is done
+   and green, invoke the **`feature-review`** skill with `base=main` and `spec=` the **verbatim
+   active plan phase plus its referenced decision docs**. It fans out a review panel — Standards,
+   Spec, `/code-review`, and `/security-review` when the diff touches security-relevant code — and
+   writes `reviews/<featureName>-review.md`. Generating the file runs fully AFK; **applying its
+   findings does not.** Produce the review and leave the working tree untouched by it. Do not fix,
+   edit, refactor, or otherwise act on anything the review surfaces in this step, not even a finding
+   that looks obviously correct or trivial. The review is output, not a to-do list you execute.
 
-9. **Request manual `[verify]` checks and review read.** Present every `[verify]` task to the user
-   in one batch — what to check and how — **and point them at `reviews/<featureName>-review.md` to
-   read**. Send a single push notification covering both, then wait. If verification fails or the
-   review surfaces something worth fixing, fix on this branch and re-request (re-running the review
-   overwrites the file).
+9. **Hand the review to the user for manual verification, and batch the `[verify]` checks.** Present
+   every `[verify]` task to the user in one batch — what to check and how — **and point them at
+   `reviews/<featureName>-review.md` to read and verify themselves.** Send a single push
+   notification covering both, then wait. **The review is the user's to verify, not yours to
+   action.** Do not apply any review finding until the user has read the review and told you which
+   findings to fix; then apply only the fixes they approved. The same gate covers `[verify]`
+   failures — fix on this branch only what the user directs. After applying approved fixes, re-run
+   the review (it overwrites the file) and hand it back for verification again.
 
 10. **Update the plan.** Check off all completed tasks (`- [x]`), record what was built, key file
     paths, and every decision made via talk-it-through. Leave the plan an accurate source of truth.
@@ -107,6 +113,9 @@ so the user gets it on their phone via Remote Control. Then wait for their respo
 - One feature per run, in full — all of its tasks, not just the next one.
 - All work happens on the feature branch, never on `main`.
 - Bias hard toward AFK; interrupt the user only for `[decision]`, `[verify]`, and PR approval.
+- The feature review is advisory and user-verified: generate it AFK, then stop. Never apply, edit,
+  or act on a review finding until the user has manually verified the review and told you which
+  findings to fix. Apply only approved fixes, then re-run the review.
 - Batch human input where possible (one notification per pause, not one per item).
 - Verify what's done against the code, not just the log.
 - Delegate read-only reconnaissance (whole-plan reading, disk/git verification) to subagents to
