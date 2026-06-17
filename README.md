@@ -32,3 +32,22 @@ The first five work as a pipeline: talk through an idea, turn the decisions into
 - **handoff**: Captures a focused slice of the current work (a bug, a new task, some context) into a handoff document a fresh agent can pick up without re-deriving everything.
 - **diagnose**: Works hard bugs and performance regressions through a disciplined loop: build a feedback loop, reproduce, minimize, hypothesize, instrument, fix, then add a regression test.
 - **teach**: Turns the current directory into a persistent teaching workspace and teaches you one topic over many sessions, one self-contained lesson at a time. The argument (what you want to learn) is optional but highly preferred: give it as much context as you can, including links, file paths, and pasted notes, since the richer the context, the better it pins down the mission and the less it has to interview you up front.
+
+## Dependencies
+
+Some skills invoke others to do their job, shown below with `→`. If you install one, install what it points to as well. `/code-review` and `/security-review` are built into Claude Code, not skills in this repo.
+
+```
+implement-next-task → tdd, talk-it-through, task-review, create-pr
+task-review         → write-well  (+ /code-review, /security-review)
+create-pr           → write-well
+write-a-prd         → write-well
+teach               → talk-it-through, write-well
+diagnose            → handoff
+```
+
+`implement-next-task` sits at the top of the chain: through `task-review` and `create-pr` it also pulls in `write-well`, so installing it means installing `tdd`, `talk-it-through`, `task-review`, `create-pr`, and `write-well` together.
+
+No dependencies (safe to install on their own): **talk-it-through**, **to-plan**, **write-well**, **tdd**, **sync-main**, **handoff**.
+
+`to-plan` writes task files that name `tdd`, `talk-it-through`, `implement-next-task`, and `task-review` as the skills that later act on them, but it doesn't invoke any of them itself.
