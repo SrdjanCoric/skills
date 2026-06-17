@@ -9,4 +9,4 @@ Ask the questions one at a time.
 
 If a question can be answered by exploring the codebase, explore the codebase instead.
 
-Once we reach shared understanding, save a summary of the final decisions to `plans/decisions/<feature-name>.md`.
+Once we reach shared understanding, give a concise in-chat summary of the final decisions and stop. **Do not** save a decision doc by default — the usual next step is to invoke the `to-plan` skill to turn the understanding into a task. Write a summary to `plans/decisions/<feature-name>.md` only if I explicitly ask you to.

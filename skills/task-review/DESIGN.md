@@ -1,7 +1,7 @@
-# `feature-review` — design decisions
+# `task-review` — design decisions
 
 Design summary from the talk-it-through on 2026-06-16. This is the contract the
-`feature-review` skill (and the `implement-next-feature` integration) is built against.
+`task-review` skill (and the `implement-next-task` integration) is built against.
 
 ## Goal
 
@@ -76,12 +76,12 @@ It supersedes the original two-axis `review` skill. Both skills are **global**
 - Lead with a short human summary: counts per lens + the single worst finding.
 
 ### Inputs (AFK vs standalone)
-- **AFK (invoked by `implement-next-feature`):** caller injects `base` and `spec`.
+- **AFK (invoked by `implement-next-task`):** caller injects `base` and `spec`.
   - `base` = `main` (feature branch is cut from main), diff via `git diff main...HEAD` (three-dot).
   - `spec` = the **verbatim active plan phase + referenced decision docs** (the real contract the
     code was built against — better than a GitHub issue).
   - No questions asked.
-- **Standalone (`/feature-review`):** self-resolves — ask for `base` if not given; hunt for the
+- **Standalone (`/task-review`):** self-resolves — ask for `base` if not given; hunt for the
   spec in order (commit issue refs → path arg → PRD under `docs/`/`specs/`/`plans/` → ask). If no
   spec exists, the Spec lens reports "no spec available."
 
@@ -103,18 +103,18 @@ It supersedes the original two-axis `review` skill. Both skills are **global**
   `.gitignore` contains `reviews/`** (appends if missing). It's ephemeral, branch-scoped
   scaffolding; `plans/` is the durable record.
 
-### Integration with `implement-next-feature` (global)
+### Integration with `implement-next-task` (global)
 Insert a new AFK step **between current step 7 (verify own work / tests green) and step 8 (manual
 `[verify]`)**:
-- After tests are green, invoke `feature-review` with `base=main` and `spec=`the verbatim active
+- After tests are green, invoke `task-review` with `base=main` and `spec=`the verbatim active
   phase + decision docs.
 - It writes `reviews/<featureName>-review.md` fully AFK.
 - Step 8's manual pause now covers **both** the `[verify]` checks **and** reading the review doc —
   one notification, one human stop. The review never blocks the run on its own findings.
 
 ### Naming & portability
-- Skill name: **`feature-review`** (avoids collision with the existing `/review`, `/code-review`,
-  `/gh-review-pr`; pairs with `implement-next-feature`).
+- Skill name: **`task-review`** (avoids collision with the existing `/review`, `/code-review`,
+  `/gh-review-pr`; pairs with `implement-next-task`).
 - Rewrite the old "two axes" description to reflect four lenses + file output.
 - **Drop the hard dependency** on `/setup-matt-pocock-skills` and `docs/agents/issue-tracker.md`;
   the issue tracker is now just one optional Spec fallback, never a precondition.

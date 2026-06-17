@@ -1,12 +1,12 @@
 ---
-name: feature-review
-description: Review a completed feature branch with a panel of parallel agents — Standards (documented conventions + test quality), Spec (faithfulness to the originating plan/issue), Bug (delegated to /code-review), and Security (delegated to /security-review, conditional). Synthesises all findings into one human-readable reviews/<feature>-review.md via the write-well skill. Use at the end of implement-next-feature (AFK) or standalone to review a branch, PR, or work-in-progress.
+name: task-review
+description: Review a completed task branch with a panel of parallel agents — Standards (documented conventions + test quality), Spec (faithfulness to the originating task/plan), Bug (delegated to /code-review), and Security (delegated to /security-review, conditional). Synthesises all findings into one human-readable reviews/<task>-review.md via the write-well skill. Use at the end of implement-next-task (AFK) or standalone to review a branch, PR, or work-in-progress.
 ---
 
-# Feature Review
+# Task Review
 
 Fan out a panel of review agents over the diff between `HEAD` and a base, then synthesise their
-findings into a single human-readable file at `reviews/<featureName>-review.md`.
+findings into a single human-readable file at `reviews/<taskName>-review.md`.
 
 Each lens runs as its **own agent** so contexts don't pollute each other. The lenses **find**;
 a single author **writes**. The author runs the `write-well` skill so the report reads like a
@@ -31,10 +31,10 @@ This skill accepts two optional inputs so it works both AFK and standalone:
 - `base` — the fixed point to diff against. Diff is always three-dot: `git diff <base>...HEAD`.
 - `spec` — the originating contract (path or verbatim text).
 
-**When a caller injects both (the AFK path, e.g. `implement-next-feature`):** use them, ask
+**When a caller injects both (the AFK path, e.g. `implement-next-task`):** use them, ask
 nothing — run fully unattended.
 
-**When invoked standalone (`/feature-review`):** self-resolve.
+**When invoked standalone (`/task-review`):** self-resolve.
 - `base`: if not given, ask "Review against what — a branch, a commit, or `main`?" Don't proceed
   without it.
 - `spec`, in order: (1) issue refs in commit messages, fetched however the repo documents;
@@ -44,8 +44,8 @@ nothing — run fully unattended.
 
 ## Process
 
-### 1. Resolve the diff and `featureName`
-Capture `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`. Derive `featureName` from
+### 1. Resolve the diff and `taskName`
+Capture `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`. Derive `taskName` from
 the branch name with any leading `feature/` stripped (`feature/foo-bar` → `foo-bar`).
 
 ### 2. Ensure `reviews/` is gitignored
@@ -79,7 +79,7 @@ Spawn one synthesis author agent. Give it every lens's findings and instruct it 
 the Synthesis rules below and returns the finished markdown.
 
 ### 6. Write the file
-Write the author's output to `reviews/<featureName>-review.md` (overwrite if it exists). Tell the
+Write the author's output to `reviews/<taskName>-review.md` (overwrite if it exists). Tell the
 user where it is.
 
 ## Finding schema
