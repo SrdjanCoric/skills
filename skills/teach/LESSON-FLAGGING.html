@@ -1,0 +1,178 @@
+<!--
+  Lesson flagging widget — paste this block verbatim into every lesson HTML.
+
+  What it does: lets the reader select any passage, flag it as "Unclear" or
+  "Explain more" with an optional note, and copy all flags to the clipboard to
+  paste back to their teacher for the next lesson.
+
+  localStorage lifecycle:
+    - Flags are stored under a per-lesson key: `teach:flags:<lesson-id>`.
+      A lesson only ever touches its own key, so flags never accumulate across
+      lessons and the copy payload is always just this lesson.
+    - "Copy my questions" clears the key after a successful copy. A flag is spent
+      once it reaches the teacher, so re-opening the lesson starts clean.
+    - "Clear" wipes this lesson's flags manually.
+
+  Set the lesson id on <body data-lesson-id="0001-some-name">. If absent, it
+  falls back to the HTML file name.
+-->
+<style>
+  .teach-flag-popup {
+    position: absolute;
+    z-index: 9999;
+    display: none;
+    gap: 4px;
+    padding: 4px;
+    background: #1f2937;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    font-family: system-ui, sans-serif;
+  }
+  .teach-flag-popup button {
+    border: 0;
+    background: transparent;
+    color: #f9fafb;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .teach-flag-popup button:hover { background: #374151; }
+  .teach-flag-tray {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 9998;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #111827;
+    color: #f9fafb;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+  }
+  .teach-flag-tray.has-flags { display: flex; }
+  .teach-flag-tray .count { font-weight: 600; }
+  .teach-flag-tray button {
+    border: 0;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .teach-flag-tray .copy { background: #2563eb; color: #fff; }
+  .teach-flag-tray .clear { background: #374151; color: #f9fafb; }
+  .teach-flag-toast {
+    position: fixed;
+    right: 20px;
+    bottom: 76px;
+    z-index: 9999;
+    display: none;
+    padding: 8px 14px;
+    background: #065f46;
+    color: #ecfdf5;
+    border-radius: 10px;
+    font-family: system-ui, sans-serif;
+    font-size: 13px;
+  }
+</style>
+
+<div class="teach-flag-popup" id="teachFlagPopup">
+  <button data-tag="Unclear">Unclear</button>
+  <button data-tag="Explain more">Explain more</button>
+</div>
+
+<div class="teach-flag-tray" id="teachFlagTray">
+  <span class="count" id="teachFlagCount">0 flags</span>
+  <button class="copy" id="teachFlagCopy">Copy my questions</button>
+  <button class="clear" id="teachFlagClear">Clear</button>
+</div>
+
+<div class="teach-flag-toast" id="teachFlagToast"></div>
+
+<script>
+(function () {
+  var lessonId =
+    document.body.getAttribute("data-lesson-id") ||
+    (location.pathname.split("/").pop() || "lesson").replace(/\.html?$/, "");
+  var storageKey = "teach:flags:" + lessonId;
+
+  var popup = document.getElementById("teachFlagPopup");
+  var tray = document.getElementById("teachFlagTray");
+  var count = document.getElementById("teachFlagCount");
+  var toast = document.getElementById("teachFlagToast");
+  var pendingSelection = "";
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(storageKey)) || []; }
+    catch (e) { return []; }
+  }
+  function save(flags) {
+    localStorage.setItem(storageKey, JSON.stringify(flags));
+    render(flags);
+  }
+  function render(flags) {
+    count.textContent = flags.length + (flags.length === 1 ? " flag" : " flags");
+    tray.classList.toggle("has-flags", flags.length > 0);
+  }
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.style.display = "block";
+    setTimeout(function () { toast.style.display = "none"; }, 2000);
+  }
+
+  document.addEventListener("mouseup", function () {
+    var sel = window.getSelection();
+    var text = sel ? sel.toString().trim() : "";
+    if (!text) { popup.style.display = "none"; return; }
+    pendingSelection = text;
+    var rect = sel.getRangeAt(0).getBoundingClientRect();
+    popup.style.top = window.scrollY + rect.top - 44 + "px";
+    popup.style.left = window.scrollX + rect.left + "px";
+    popup.style.display = "flex";
+  });
+
+  popup.addEventListener("click", function (e) {
+    var tag = e.target.getAttribute("data-tag");
+    if (!tag || !pendingSelection) return;
+    var note = prompt("Optional note (leave blank to skip):", "") || "";
+    var flags = load();
+    flags.push({ tag: tag, passage: pendingSelection, note: note.trim() });
+    save(flags);
+    popup.style.display = "none";
+    window.getSelection().removeAllRanges();
+  });
+
+  document.getElementById("teachFlagCopy").addEventListener("click", function () {
+    var flags = load();
+    if (!flags.length) return;
+    var lines = [
+      "Follow-up for lesson: " + lessonId,
+      "Generate the next lesson that resolves these flags.",
+      "",
+    ];
+    flags.forEach(function (f, i) {
+      lines.push((i + 1) + ". [" + f.tag + '] "' + f.passage + '"');
+      if (f.note) lines.push("   note: " + f.note);
+    });
+    var block = lines.join("\n");
+    navigator.clipboard.writeText(block).then(function () {
+      localStorage.removeItem(storageKey);
+      render([]);
+      showToast("Copied and cleared. Paste it to your teacher.");
+    }).catch(function () {
+      showToast("Copy failed. Select the text manually.");
+    });
+  });
+
+  document.getElementById("teachFlagClear").addEventListener("click", function () {
+    localStorage.removeItem(storageKey);
+    render([]);
+  });
+
+  render(load());
+})();
+</script>
