@@ -35,7 +35,7 @@ The first five work as a pipeline: talk through an idea, turn the decisions into
 
 ## Dependencies
 
-Some skills invoke others to do their job, shown below with `→`. If you install one, install what it points to as well. `/code-review` and `/security-review` are built into Claude Code, not skills in this repo.
+Some skills invoke others to do their job, shown below with `→`. The installer does **not** follow these links: `--skill X` installs only `X`, so you have to add its dependencies yourself. `/code-review` and `/security-review` are built into Claude Code, not skills in this repo.
 
 ```
 implement-next-task → tdd, talk-it-through, task-review, create-pr
@@ -46,7 +46,13 @@ teach               → talk-it-through, write-well
 diagnose            → handoff
 ```
 
-`implement-next-task` sits at the top of the chain: through `task-review` and `create-pr` it also pulls in `write-well`, so installing it means installing `tdd`, `talk-it-through`, `task-review`, `create-pr`, and `write-well` together.
+`implement-next-task` sits at the top of the chain: through `task-review` and `create-pr` it also needs `write-well`. To install it with everything it depends on in one go:
+
+```bash
+npx skills@latest add SrdjanCoric/skills --skill implement-next-task --skill tdd --skill talk-it-through --skill task-review --skill create-pr --skill write-well
+```
+
+Or just run `npx skills@latest add SrdjanCoric/skills` with no `--skill` flag and pick what you want from the list.
 
 No dependencies (safe to install on their own): **talk-it-through**, **to-plan**, **write-well**, **tdd**, **sync-main**, **handoff**.
 
