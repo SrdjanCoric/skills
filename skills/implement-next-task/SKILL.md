@@ -37,11 +37,16 @@ exists, ask the user.
    references only when an item depends on it. The task file is self-contained, so the PRD and the
    other tasks never enter context.
 
-2. **Verify reality.** Check the task's own implementation-log/claims (if any) against git history
-   and the files on disk — a short drift report: what's claimed done vs what the code shows, the
-   paths the task touches, the current branch and HEAD. Trust the code over the log. Read the
-   specific files you'll edit directly; editing needs exact content. Delegate this recon to an
-   `Explore` subagent if it keeps main context smaller.
+2. **Verify reality — delegate the research to a subagent; do not sweep the codebase inline.**
+   The recon sweep is the single biggest context sink, so it runs in a subagent's context, not the
+   main thread. Spawn an `Explore` (or `general-purpose`) subagent and have it return **one
+   structured digest**: a drift report (what the task's log/claims say vs what the code shows), the
+   exact files and line ranges each item touches, the test files plus the conventions a new test
+   must match, and the minimal current-code excerpts you'll need to write each red test and each
+   fix. Trust the code over the log. Read back only that digest — never the pile of files it read.
+   The only files you open directly in the main agent are pulled **just-in-time in step 6**, one at
+   a time, immediately before you edit each, because Edit needs the exact current content. If the
+   digest is thin, send the subagent back for more rather than reading the files yourself.
 
 3. **Confirm the task.** State clearly which task you're implementing (ordinal + title) before you
    start.
@@ -106,8 +111,9 @@ so the user gets it on their phone via Remote Control. Then wait for their respo
   fix. Apply only approved fixes, then re-run the review.
 - Batch human input where possible (one notification per pause, not one per item).
 - Verify what's done against the code, not just the log.
-- The master plan is small — read it directly; delegate only heavier disk/git recon to a subagent
-  if it keeps main context smaller. Keep judgment, the verbatim task file, the TDD implementation,
-  and any file you edit in the main agent.
+- Research is delegated by default, not on a judgment call: the recon/understanding sweep always
+  runs in a subagent that returns a digest, so the broad reading never lands in the main thread.
+  Keep only judgment, the verbatim task file, that digest, the TDD implementation, and the one file
+  you're editing right now in the main agent. The master plan itself is small — read it directly.
 - On completion: move the task file to `tasks/done/` and flip its pointer before finishing; PR only
   via createpr, only after approval.
