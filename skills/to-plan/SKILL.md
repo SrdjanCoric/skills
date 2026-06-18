@@ -44,9 +44,14 @@ end-to-end, not a horizontal slice of one layer.
 <vertical-slice-rules>
 - Each slice delivers a narrow but COMPLETE path through every layer (schema, API, UI, tests)
 - A completed slice is demoable or verifiable on its own
-- Prefer many thin slices over few thick ones
+- **Make each slice the SMALLEST it can be while staying a complete vertical slice.** The floor: it
+  must still cut through all layers and be demoable on its own. Stay at that floor — every extra
+  behavior folded in costs more to build and review.
+- Split test: if a slice contains two independently demoable behaviors, split it into two slices
+  ordered forward-only. Default to splitting.
 - Each task IS a feature on its own branch. Name it when drafting: `feature/<kebab-slug>`
-- Sizing test: right size for ONE branch / one PR — demoable, mergeable without waiting on later tasks
+- Sizing test: the smallest demoable change mergeable without waiting on later tasks. One PR is the
+  ceiling, not the target.
 - Order tasks **forward-only**: a later task must never block an earlier one. The plan's order is
   the execution order, so the first unfinished pointer is always runnable on its own.
 - Do NOT include specific file names or details likely to change as later tasks are built
