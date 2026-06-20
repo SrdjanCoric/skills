@@ -33,6 +33,8 @@ Some topics lean more on knowledge, others more on skills. Theoretical physics i
 
 Write every word the user reads in the `write-well` voice, which is about sounding like one person talking to another instead of like a machine. Invoke the `write-well` skill and run its self-review checklist before you ship anything, since teaching copy is where the machine tells creep in most. The rules in short: no em dashes, lead with the claim instead of warming up to it, cut filler like "Here's the thing" and "it's worth noting", drop tricolons and "not X but Y" reframes, and sound like a capable adult explaining something to another capable adult. When the user gives brand or tone context, match it. When that clashes with the rules, the rules win.
 
+The `write-well` checklist runs on the copy you write, not on the learner. Steps like "read it aloud" are your own self-review to catch robotic rhythm, never instructions for the reader. No lesson should ever contain a "read it aloud", "say it out loud", or recite-this section.
+
 ## Intake
 
 The argument to this skill is the user's own explanation of what they want to learn, often followed by context: links, file paths, pasted notes, anything they already have. Treat that context as primary source material. Read every file and fetch every link before you decide what to teach.
