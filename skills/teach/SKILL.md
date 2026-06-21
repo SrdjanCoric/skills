@@ -31,7 +31,11 @@ Some topics lean more on knowledge, others more on skills. Theoretical physics i
 
 ## Voice
 
-Write every word the user reads in the `write-well` voice, which is about sounding like one person talking to another instead of like a machine. Invoke the `write-well` skill and run its self-review checklist before you ship anything, since teaching copy is where the machine tells creep in most. The rules in short: no em dashes, lead with the claim instead of warming up to it, cut filler like "Here's the thing" and "it's worth noting", drop tricolons and "not X but Y" reframes, and sound like a capable adult explaining something to another capable adult. When the user gives brand or tone context, match it. When that clashes with the rules, the rules win.
+Write every word the user reads in the `write-well` voice, which is about sounding like one person talking to another instead of like a machine.
+
+**Blocking gate, no exceptions:** before any lesson or reference file reaches the user, you MUST invoke the `write-well` Skill (via the Skill tool) and run its adversarial audit pass over the file you just wrote, fixing what it finds. This applies to every lesson, every follow-up, and every revision, the first one included. "I wrote it in the write-well voice from memory" does NOT satisfy this; the audit is a separate pass you run after drafting. Do not tell the user a lesson is ready, and do not give the open command, until the audit has run and its findings are resolved. If you catch yourself about to ship without having invoked the skill this turn, stop and run it.
+
+Run the audit because teaching copy is where the machine tells creep in most. The rules in short: no em dashes, lead with the claim instead of warming up to it, cut filler like "Here's the thing" and "it's worth noting", drop tricolons and "not X but Y" reframes, and sound like a capable adult explaining something to another capable adult. When the user gives brand or tone context, match it. When that clashes with the rules, the rules win.
 
 The `write-well` checklist runs on the copy you write, not on the learner. Steps like "read it aloud" are your own self-review to catch robotic rhythm, never instructions for the reader. No lesson should ever contain a "read it aloud", "say it out loud", or recite-this section.
 
@@ -72,6 +76,8 @@ Produce exactly one lesson at a time, then stop and hand control back to the use
 The lesson is the only channel for teaching. Once the workspace is aligned and you are teaching, answer every question the user asks with a lesson, never with an inline reply in the terminal. A question about the material is a request for the next lesson, so build it as one. Treat everything in the session as part of teaching until the user clears the session; if they want a plain chat instead, that is their call to make by clearing, not yours to assume. (Intake and alignment at the very start are the exception, since there is nothing to teach yet.)
 
 Make opening a lesson as easy as possible, ideally a single CLI command that opens the HTML file in the browser.
+
+Every lesson follows the same fixed sequence, and you do not skip a step: (1) draft the lesson HTML, (2) invoke the `write-well` Skill and run its audit pass over that file, (3) apply the fixes, (4) only then hand the lesson to the user with its open command. Step 2 is mandatory on every single lesson. See the blocking gate in [Voice](#voice).
 
 ## Flagging and follow-up lessons
 
