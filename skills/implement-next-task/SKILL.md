@@ -73,12 +73,16 @@ exists, ask the user.
    invoke the **`task-review`** skill with `base=main` and `spec=` the **verbatim task file plus
    its referenced decision docs**. It fans out a panel — Standards, Spec, `/code-review`, and
    `/security-review` when the diff touches security-relevant code — and writes
-   `reviews/<taskName>-review.md`. Generating the file is AFK; **applying its findings is not.**
-   Leave the working tree untouched by it. Do not fix, edit, or act on anything it surfaces here,
-   not even an obviously-correct finding. The review is output, not a to-do list.
+   `reviews/<taskName>-review.md`. **`task-review` derives `<taskName>` from the branch, which omits
+   the ordinal — so prefix the task number onto the review file: ensure it lands at
+   `reviews/NNNN-<taskName>-review.md` (e.g. `reviews/0031-guardrail-terminate-manipulation-review.md`),
+   renaming `task-review`'s output if needed, so reviews sort by task and tie back to the plan.**
+   Generating the file is AFK; **applying its findings is not.** Leave the working tree untouched by
+   it. Do not fix, edit, or act on anything it surfaces here, not even an obviously-correct finding.
+   The review is output, not a to-do list.
 
 9. **Hand the review to the user, and batch the `[verify]` checks.** Present every `[verify]` item
-   in one batch — what to check and how — **and point them at `reviews/<taskName>-review.md` to
+   in one batch — what to check and how — **and point them at `reviews/NNNN-<taskName>-review.md` to
    read and verify themselves.** Send a single push notification, then wait. Do not apply any
    review finding until the user has read the review and told you which to fix; then apply only the
    approved fixes. The same gate covers `[verify]` failures. After applying approved fixes, re-run
