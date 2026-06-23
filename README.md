@@ -23,7 +23,7 @@ The first five work as a pipeline: talk through an idea, turn the decisions into
 - **talk-it-through**: Interviews you about a plan, design, or idea, one question at a time, until you've reached shared understanding. Walks down each branch of the decision tree and saves the final decisions to a file.
 - **write-a-prd**: Turns the current conversation or a decision document into a PRD and saves it to a local file.
 - **to-plan**: Turns a PRD, decision doc, or the current conversation into self-contained task files under `plans/tasks/`, each appended as a pointer to the project's single master plan.
-- **implement-next-task**: Implements the next uncompleted task from the master plan on its own branch. Runs the autonomous work on its own, pulls you in for decisions and manual verification, and ends in a PR after your approval.
+- **implement-next-task**: Implements the next uncompleted task from the master plan on its own branch. Runs the autonomous work on its own, pulls you in for decisions and manual verification, and ends in a PR after your approval. Pass `--worktree` to claim the task (marking it in-progress in the plan) and build it in a dedicated git worktree, so it can run in parallel with other work without touching your current checkout.
 - **task-review**: Reviews a finished task branch with a panel of parallel agents (standards, spec faithfulness, bugs, and security) and synthesizes their findings into one readable review file under `reviews/`.
 - **write-well**: Writes and revises prose in a direct, human voice. Enforces a strict checklist for stripping the tells that make text read as machine-generated.
 - **sync-main**: Checks out the main branch and pulls the latest changes, warning you first if uncommitted work would be overwritten.
