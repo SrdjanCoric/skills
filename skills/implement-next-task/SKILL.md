@@ -32,8 +32,8 @@ pointer means another agent has already claimed that task (often in a worktree),
 the next available one. Find the master plan via `CLAUDE.md` "Active plan"; only if no plan exists,
 ask the user.
 
-An optional `--worktree` flag — claim the task and build it in a dedicated git worktree instead of
-the current checkout (see **Worktree mode** below).
+An optional `--worktree` flag — build the task in a dedicated git worktree instead of the current
+checkout (see **Worktree mode** below).
 
 ## Worktree mode (`--worktree`)
 
@@ -64,7 +64,9 @@ hardcode them.
 
 1. **Load the task.** Read the master plan directly (it's small): take the
    `## Architectural decisions` header and the first **available** pointer — skipping `[x]` (done)
-   and `[~]` (in progress) — or the one named by the argument. Then read **that one task file** directly, in full — its `**Branch**` field, every
+   and `[~]` (in progress) — or the one named by the argument. **Claim it immediately:** flip its
+   pointer `[ ]→[~]` in the master plan before any other work, so a concurrent run — worktree or
+   not — skips it. Then read **that one task file** directly, in full — its `**Branch**` field, every
    AFK/`[decision]`/`[verify]` item, and acceptance criteria. Read a decision doc the task
    references only when an item depends on it. The task file is self-contained, so the PRD and the
    other tasks never enter context.
@@ -128,9 +130,8 @@ hardcode them.
 10. **Complete the task.** Check off the items in the task file, record what was built, key file
     paths, and every decision made; append a short implementation-log note in the task file.
     **Move the task file from `plans/tasks/` to `plans/tasks/done/`**, and in the master plan flip
-    its pointer to `[x]` (from `[ ]` standalone, or from `[~]` in worktree mode) and repoint the
-    link to `tasks/done/`. In worktree mode, write these at the resolved main-checkout path. Leave
-    both an accurate source of truth.
+    its pointer `[~]→[x]` and repoint the link to `tasks/done/`. In worktree mode, write these at
+    the resolved main-checkout path. Leave both an accurate source of truth.
 
 11. **Get approval, then open the PR.** When everything is finished — AFK done, tests green,
     manual verifications confirmed, task moved to done, plan updated — ask the user to approve
@@ -147,11 +148,10 @@ so the user gets it on their phone via Remote Control. Then wait for their respo
 
 - One task per run, in full — all of its items, not just the next one.
 - All work happens on the feature branch, never on `main`.
-- Selection always skips both `[x]` (done) and `[~]` (in progress) pointers. Worktree mode
-  (`--worktree`): claim the task as `[~]` before creating `../<repo>-<slug>`, build there, read and
-  write the plan at the resolved main-checkout path, and flip `[~]→[x]` on completion. Standalone
-  runs don't claim `[~]`, so two concurrent standalone runs could grab the same task — for parallel
-  work use `--worktree`, which claims.
+- Selection always skips both `[x]` (done) and `[~]` (in progress) pointers. Every run claims its
+  task `[~]` on selection and flips `[~]→[x]` on completion, so concurrent runs — worktree or not —
+  never collide. Worktree mode (`--worktree`) adds only: build in `../<repo>-<slug>` and read/write
+  the plan at the resolved main-checkout path.
 - Bias hard toward AFK; interrupt the user only for `[decision]`, `[verify]`, and PR approval.
 - The task review is advisory and user-verified: generate it AFK, then stop. Never apply, edit, or
   act on a review finding until the user has manually verified the review and told you which to
