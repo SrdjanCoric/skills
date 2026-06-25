@@ -22,11 +22,11 @@ The first five work as a pipeline: talk through an idea, turn the decisions into
 
 - **talk-it-through**: Interviews you about a plan, design, or idea, one question at a time, until you've reached shared understanding. Walks down each branch of the decision tree and saves the final decisions to a file.
 - **write-a-prd**: Turns the current conversation or a decision document into a PRD and saves it to a local file.
-- **to-plan**: Turns a PRD, decision doc, or the current conversation into self-contained task files under `plans/tasks/`, each appended as a pointer to the project's single master plan.
-- **implement-next-task**: Implements the next uncompleted task from the master plan on its own branch. Runs the autonomous work on its own, pulls you in for decisions and manual verification, and ends in a PR after your approval. Pass `--worktree` to claim the task (marking it in-progress in the plan) and build it in a dedicated git worktree, so it can run in parallel with other work without touching your current checkout.
+- **to-plan**: Turns a PRD, decision doc, or the current conversation into self-contained task files under `plans/tasks/`, each appended as a pointer to the project's single master plan. It records each task's prerequisites as `(after …)` edges on the pointers, so `implement-next-task --worktree` can find work to build in parallel without stepping on an unfinished task.
+- **implement-next-task**: Implements the next uncompleted task from the master plan on its own branch. Runs the autonomous work on its own, pulls you in for decisions and manual verification, and ends in a PR after your approval. It only starts a task once its prerequisites are merged, so it never builds on code that isn't on `main` yet. Pass `--worktree` to build in a dedicated git worktree instead of your current checkout: it claims the next task with no unmerged prerequisites, runs it alongside whatever else is in flight, and tells you when there's nothing independent left to start.
 - **task-review**: Reviews a finished task branch with a panel of parallel agents (standards, spec faithfulness, bugs, and security) and synthesizes their findings into one readable review file under `reviews/`.
 - **write-well**: Writes and revises prose in a direct, human voice. Enforces a strict checklist for stripping the tells that make text read as machine-generated.
-- **sync-main**: Checks out the main branch and pulls the latest changes, warning you first if uncommitted work would be overwritten.
+- **sync-main**: Checks out main and pulls the latest changes, warning you first if uncommitted work would be overwritten. Run from a worktree, it removes that worktree and deletes its branch. It also deletes local branches already merged into main and closes out the tasks they finished: each merged pointer flips to done in the master plan and its task file moves to `plans/tasks/done/`. That releases any task that was waiting on the merged one.
 - **create-pr**: Commits and pushes the current changes if needed, then opens a PR with a structured, auto-generated description (overview plus per-file key changes).
 - **tdd**: Builds features and fixes bugs test-first with a red-green-refactor loop. Ships with reference notes on writing tests, mocking, refactoring, and module design.
 - **handoff**: Captures a focused slice of the current work (a bug, a new task, some context) into a handoff document a fresh agent can pick up without re-deriving everything.
@@ -57,3 +57,5 @@ Or just run `npx skills@latest add SrdjanCoric/skills` with no `--skill` flag an
 No dependencies (safe to install on their own): **talk-it-through**, **to-plan**, **write-well**, **tdd**, **sync-main**, **handoff**.
 
 `to-plan` writes task files that name `tdd`, `talk-it-through`, `implement-next-task`, and `task-review` as the skills that later act on them, but it doesn't invoke any of them itself.
+
+`sync-main` isn't an install-time dependency of `implement-next-task`, but the two share a task's lifecycle: `implement-next-task` opens the PR and leaves the task done-but-unmerged, then `sync-main` marks it merged once the PR lands.
