@@ -1,6 +1,6 @@
 ---
 name: task-review
-description: Review a completed task branch with a panel of parallel agents — Standards (documented conventions + test quality), Spec (faithfulness to the originating task/plan), Bug (delegated to /code-review), and Security (delegated to /security-review, conditional). Synthesises all findings into one human-readable reviews/<task>-review.md via the write-well skill. Use at the end of implement-next-task (AFK) or standalone to review a branch, PR, or work-in-progress.
+description: Review a completed task branch with a panel of parallel agents — Standards (documented conventions + test quality), Spec (faithfulness to the originating task/plan), Bug (delegated to /code-review), and Security (delegated to /security-review, conditional). Synthesises all findings into one human-readable reviews/<task>-review.md via the write-well skill. Use at the end of implement-next-task (AFK) or standalone to review a branch, PR, or work-in-progress. Pass --afk to run as a blocking in-loop gate — returns structured findings in context (no reviews/ document) and flags security findings for human escalation.
 ---
 
 # Task Review
@@ -41,6 +41,8 @@ nothing — run fully unattended.
   (2) a path passed as an argument; (3) a PRD/plan under `plans/`, `docs/`, or `specs/` matching
   the branch/feature; (4) ask the user. If there genuinely is none, the Spec lens reports
   "no spec available" and is skipped.
+- `--afk` — blocking-gate mode for the orchestrator: return findings in context, write no file.
+  See **AFK mode**.
 
 ## Process
 
@@ -81,6 +83,24 @@ the Synthesis rules below and returns the finished markdown.
 ### 6. Write the file
 Write the author's output to `reviews/<taskName>-review.md` (overwrite if it exists). Tell the
 user where it is.
+
+## AFK mode (`--afk`)
+
+Called by `implement-next-task --afk`, `task-review` is a **blocking in-loop gate**, not a document
+to be read. Steps 1, 3, and 4 run unchanged (resolve the diff, decide whether Security runs, fan
+out the panel). Steps 2, 5, and 6 change:
+
+- **Skip step 2** — nothing is written, so there's no `reviews/` file to gitignore.
+- **Replace steps 5–6** — do **not** synthesise via `write-well` and do **not** write a file.
+  Instead, dedupe the lenses' findings (merging identical ones, noting which lens flagged each) and
+  **return the raw JSON Finding array in context** to the caller. No prose, no `reviews/` document.
+
+The caller acts on the findings immediately (that's the point of AFK): `blocker`/`major` findings on
+`bug`, `standards` (test-quality), and `spec` get fixed and the review re-run; **any `security`
+finding is never auto-fixed — it's a human escalation.** So preserve every finding's `axis` and
+`severity` exactly, and never drop or down-rank a `security` finding to keep the gate flowing. If
+Security was skipped (step 3 found no security-relevant surface), say so in the returned payload —
+a silent absence must never read as "security passed."
 
 ## Finding schema
 

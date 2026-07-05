@@ -1,6 +1,6 @@
 ---
 name: to-plan
-description: Turn a source (PRD, decision doc, or the current conversation) into one or more self-contained task files under plans/tasks/, appended as pointers to the project's single master plan. Use when the user wants to break work into tasks, plan a feature, turn a PRD/decision/chat into actionable work, or mentions "tracer bullets".
+description: Turn a source (PRD, decision doc, or the current conversation) into one or more self-contained task files under plans/tasks/, appended as pointers to the project's single master plan. Use when the user wants to break work into tasks, plan a feature, turn a PRD/decision/chat into actionable work, or mentions "tracer bullets". Pass --afk to plan for the autopilot orchestrator — tagging human-in-the-loop work only when strictly necessary.
 ---
 
 # To Plan
@@ -91,6 +91,8 @@ From a fat PRD this yields several tasks; from a decision doc or a chat it's usu
 
 ### 5. Break each task into AFK and human-in-the-loop work
 
+*(Under `--afk`, tighten this hard — see **AFK mode** below.)*
+
 - **AFK tasks** — everything the agent can implement *and verify* autonomously: code, schema,
   migrations, tests, automated checks. The **default bucket**, implemented via the **tdd** skill.
   Phrase so the test comes first where it makes sense.
@@ -158,6 +160,36 @@ map; omit the suffix when `Depends on` is `none`:
 ```
 
 Tell the user which task files you created and where they sit in the plan order.
+
+---
+
+## AFK mode (`--afk`)
+
+`--afk` plans for the autopilot orchestrator, which builds each task with
+`implement-next-task --afk` and merges without a human on the happy path. It changes only
+**step 5's bucketing**: bias to AFK even harder than the standard `afk-bias-rule`. A task earns a
+`[verify]` or `[decision]` tag *only* when it falls in the **must-be-human set**; everything else
+is forced AFK.
+
+The must-be-human set — the only reasons an AFK run may stop for a person:
+
+- **Destructive data** — schema migrations, bulk deletes/backfills, anything that mutates
+  existing data irreversibly.
+- **Trust boundary** — auth/authz, sessions, crypto, or any code that handles real secrets.
+- **Money** — payments, billing, quotas.
+- **Breaking contract** — public API / interface changes that break existing callers.
+- **The cage** — CI/CD config, the container/firewall/sandbox definition, dependency additions or
+  bumps, MCP config. The autopilot must never widen its own sandbox unreviewed.
+- **Final acceptance** — the "is the app actually right" sign-off, only when it genuinely can't be
+  an automated eval.
+
+Two hard rules under `--afk`:
+
+- **Resolve every `[decision]` at plan time.** An AFK run must not stop mid-task to interview the
+  user. A `[decision]` survives into the plan only if it truly cannot be settled now — prefer to
+  settle it here and record it in the architectural header or the task file.
+- **A `[verify]` must name a must-be-human reason above.** If a check can become a test, script, or
+  automated eval, it is AFK. No "I'd feel better eyeballing it" exceptions.
 
 ---
 

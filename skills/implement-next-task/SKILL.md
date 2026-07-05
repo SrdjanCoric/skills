@@ -1,6 +1,6 @@
 ---
 name: implement-next-task
-description: Implement the next uncompleted task from the project's master plan on its own feature branch — all AFK work autonomously, human-in-the-loop work via talk-it-through and manual verification, ending in a PR after user approval. Use when invoked with a task id/path, or when the user asks to build/implement the next task.
+description: Implement the next uncompleted task from the project's master plan on its own feature branch — all AFK work autonomously, human-in-the-loop work via talk-it-through and manual verification, ending in a PR after user approval. Use when invoked with a task id/path, or when the user asks to build/implement the next task. Pass --afk for autopilot: task-review runs as a blocking in-loop gate, and only genuine [decision]/[verify] items and security findings stop for a human.
 ---
 
 # Implement Next Task
@@ -56,6 +56,9 @@ blocking, note that its PR may already be merged and `sync-main` simply wasn't r
 An optional `--worktree` flag — build the task in a dedicated git worktree instead of the current
 checkout (see **Worktree mode** below).
 
+An optional `--afk` flag — autopilot mode for the orchestrator (see **AFK mode** below). Composes
+with `--worktree`.
+
 ## Worktree mode (`--worktree`)
 
 With `--worktree`, run the same workflow but build in an isolated worktree so the task can proceed
@@ -108,6 +111,37 @@ hardcode them.
    move to `tasks/done/` happen later: run `sync-main` from the worktree once the PR merges, to mark
    it merged and tear the worktree down (it removes the worktree, refreshes `main`, deletes the
    branch, and closes out the pointer).
+
+## AFK mode (`--afk`)
+
+`--afk` is autopilot: the orchestrator runs this skill unattended and merges without a human on the
+happy path. The only human touchpoints it keeps are genuine `[decision]` items (step 5), `[verify]`
+items (step 9), and security findings (below). It removes the two **blanket** gates — the
+review-doc verification and the PR approval — that the manual flow applies to every task.
+
+Three Workflow steps change under `--afk`:
+
+- **Step 8 — task-review is a blocking, in-loop gate.** Invoke `task-review` with `--afk`: it
+  returns findings **in context** and writes **no** `reviews/` document.
+- **Step 9 — the review is acted on automatically, not handed to a human.** Replace the
+  review-verification entirely with:
+  - **Correctness (bug), test-quality (standards-tests), and spec findings at `blocker`/`major`**
+    → fix immediately, then re-invoke `task-review --afk`. Allow **two** re-review passes; still not
+    clean after the second → **halt + `PushNotification`**.
+  - **Any `security` finding at `blocker`/`major`** → **never auto-fix. Halt + `PushNotification`
+    immediately.** A security finding on a task the plan sent down the AFK path also means it was
+    mis-tagged — a security change must never auto-merge.
+  - `minor`/`nit` on any axis are advisory: note them in the PR audit line, don't block.
+
+  The `[verify]` batch still runs for any task that *has* `[verify]` items — present them, send one
+  `PushNotification`, and wait. (A clean AFK task has none, so this is a no-op.)
+- **Step 11 — no PR-approval gate.** Once the review is clean (advisory-only findings aside) and any
+  `[verify]` items are confirmed, invoke `createpr` **without** asking for approval, then flip
+  `[~]→[>]`. Add one audit line to the PR body: `task-review --afk: <N> findings auto-fixed
+  (correctness/test-quality), clean after <M> pass(es); security: clean`.
+
+This skill still **stops at `[>]`**. Waiting for CI and merging the PR is the **orchestrator's**
+job, not this skill's; `sync-main` still does `[>]→[x]` post-merge. Composes with `--worktree`.
 
 ## Workflow
 
