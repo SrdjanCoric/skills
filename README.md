@@ -1,6 +1,6 @@
 # Skills
 
-My personal [Claude Code](https://claude.com/claude-code) skills. Each skill is a folder under `skills/` with a `SKILL.md` that tells Claude when to activate and what to do.
+My personal [Claude Code](https://claude.com/claude-code) skills, also usable in Codex. Each skill is a folder under `skills/` with a `SKILL.md` that tells the agent when to activate and what to do.
 
 ## Installation
 
@@ -35,11 +35,13 @@ The first five work as a pipeline: talk through an idea, turn the decisions into
 
 ## Dependencies
 
-Some skills invoke others to do their job, shown below with `→`. The installer does **not** follow these links: `--skill X` installs only `X`, so you have to add its dependencies yourself. `/code-review` and `/security-review` are built into Claude Code, not skills in this repo.
+Some skills invoke others to do their job, shown below with `→`. The installer does **not** follow these links: `--skill X` installs only `X`, so you have to add its dependencies yourself. `task-review` uses `/code-review` and `/security-review` in Claude Code. Inside Codex, it uses `/review`, an `@codex` review step in PR workflows, and `$codex-security:security-diff-scan` after the Codex Security plugin is installed.
+
+> **Codex users:** the security lens of `task-review` runs `$codex-security:security-diff-scan`, which only exists after you install the Codex Security plugin. Install that plugin before running `task-review` in Codex, or its security review has nothing to call.
 
 ```
 implement-next-task → tdd, talk-it-through, task-review, create-pr
-task-review         → write-well  (+ /code-review, /security-review)
+task-review         → write-well  (+ /code-review and /security-review in Claude Code; /review or @codex review, $codex-security:security-diff-scan in Codex)
 create-pr           → write-well
 write-a-prd         → write-well
 teach               → talk-it-through, write-well

@@ -16,40 +16,38 @@ It supersedes the original two-axis `review` skill. Both skills are **global**
 ## Decisions
 
 ### Scope & identity
-- **Not a correctness reviewer itself.** Bug/security/efficiency hunting is delegated to the
-  existing `/code-review` and `/security-review` skills, which join the panel as separate agents.
+- **Not a correctness reviewer itself.** Bug/security/efficiency hunting is delegated to
+  `/code-review` and `/security-review` in Claude Code. Inside Codex, bug review uses `/review`
+  (or an `@codex` review step in PR workflows), and security review uses
+  `$codex-security:security-diff-scan` after installing the Codex Security plugin. These join the
+  panel as separate agents.
   This skill's native value is the two lenses those don't cover: **Standards** and **Spec**.
 - **Four lenses, not two:**
   - **Standards** — does the diff follow this repo's *documented* coding standards? Includes a
     **test-quality** check (are the tests meaningful, do they cover the spec's named edges, are
     they bent/tautological/over-mocked?) — justified because "never bend tests" and the `tdd`
-    skill's good-vs-bad-test rules are documented standards. `/code-review` hunts bugs but does
+    skill's good-vs-bad-test rules are documented standards. `/code-review` and `/review` hunt bugs but do
     **not** audit test meaningfulness, so this is non-redundant.
   - **Spec** — does the diff faithfully implement the originating spec? Missing/partial
     requirements, scope creep, mis-implementations.
-  - **Bug** — delegated to `/code-review`.
-  - **Security** — delegated to `/security-review`, **conditional** (see below).
+  - **Bug** — delegated to `/code-review` in Claude Code; `/review` inside Codex, or an `@codex` review step in PR workflows.
+  - **Security** — delegated to `/security-review` in Claude Code; `$codex-security:security-diff-scan` in Codex, **conditional** (see below).
 - **Why correctness is still reviewed despite TDD:** TDD only covers behaviours the author chose
   to test (`tdd` skill: "you can't test everything"), tests through public interfaces (misses
   security/concurrency/edge cases), and can't audit itself. So a review pass is still warranted —
-  concentrated in test-quality (Standards lens) and bug-hunting (`/code-review`).
+  concentrated in test-quality (Standards lens) and bug-hunting (`/code-review` or `/review`).
 
 ### Execution model
 - **One agent per lens**, run in parallel, so contexts don't pollute each other.
 - **Hybrid execution (c):** Standards + Spec run from **inline briefs** defined in this skill
-  (they have no external home). Bug + Security **invoke the real `/code-review` and
-  `/security-review`** so their logic is never forked/drifted.
-- **Invocation feasibility — VERIFIED 2026-06-16.** A `general-purpose` subagent **can** invoke
-  `/code-review` via the Skill tool. Key learning: `/code-review` is a **prompt skill**, not a
-  self-contained tool — invoking it *injects a playbook* the calling agent then executes inline;
-  it does **not** spawn a sub-process that returns a finished report. Its literal playbook wants to
-  fan out its *own* nested finder/verifier agents, but a **leaf subagent cannot spawn sub-agents**,
-  so the Bug/Security lens executes the playbook **inline in a single agent** (several tool
-  round-trips) and loses `/code-review`'s internal parallelism. That's acceptable at default
-  effort: we get the real skill's **checklist + output contract** without its multi-agent depth.
-  No network/PR access needed (`--comment`/`--fix`/`ultra` are opt-in). The lens agent must be told
-  to (a) execute the playbook inline, not try to nest agents, and (b) honour the JSON Finding
-  contract — `/code-review` returns prose otherwise.
+  (they have no external home). In Claude Code, Bug invokes `/code-review` and Security invokes
+  `/security-review`. In Codex, Bug invokes `/review` (or an `@codex` review step in PR workflows)
+  and Security invokes `$codex-security:security-diff-scan` after installing the Codex Security
+  plugin, so its logic is never forked/drifted.
+- **Invocation feasibility — UPDATED 2026-07-06.** Keep `/code-review` and `/security-review` for
+  Claude Code. In Codex, use `/review`; in PR workflows, use an `@codex` review step instead. For
+  Codex security review, use the Codex Security plugin scan command after the plugin is installed.
+  The lens agent must still honour the JSON Finding contract.
 - **Bug-lens effort: default** (not `high`) — keeps the auto-run cheap.
 - **Lens agents return structured findings, not prose.** A single **synthesis author** then
   writes the whole report **through the `write-well` skill** — one voice, human-readable, not four
@@ -114,7 +112,7 @@ Insert a new AFK step **between current step 7 (verify own work / tests green) a
 
 ### Naming & portability
 - Skill name: **`task-review`** (avoids collision with the existing `/review`, `/code-review`,
-  `/gh-review-pr`; pairs with `implement-next-task`).
+  and `/gh-review-pr`; pairs with `implement-next-task`).
 - Rewrite the old "two axes" description to reflect four lenses + file output.
 - **Drop the hard dependency** on `/setup-matt-pocock-skills` and `docs/agents/issue-tracker.md`;
   the issue tracker is now just one optional Spec fallback, never a precondition.
@@ -126,9 +124,8 @@ glitch. The clean text is reconstructed in this design; the new SKILL.md is auth
 corruption does not carry over.
 
 ## Open items for build
-- ~~Verify a spawned subagent can invoke `/code-review` / `/security-review`~~ — **DONE**, it can
-  (see Execution model). Apply the same expectation to `/security-review` (also prompt-driven).
-- ~~Decide the `/code-review` effort level~~ — **default**.
+- ~~Verify review/security delegation paths~~ — **UPDATED 2026-07-06** (see Execution model).
+- ~~Decide the `/code-review`/`/review` effort level~~ — **default**.
 - Constrain the Bug lens to emit `axis: "bug"` for *all* its findings (the test showed
-  `/code-review` mapping onto its own categories like `efficiency`/`robustness`); optionally carry
+  `/code-review` or `/review` mapping onto its own categories like `efficiency`/`robustness`); optionally carry
   the original category in a free-text note inside `claim`.

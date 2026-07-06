@@ -1,6 +1,16 @@
 ---
 name: task-review
-description: Review a completed task branch with a panel of parallel agents — Standards (documented conventions + test quality), Spec (faithfulness to the originating task/plan), Bug (delegated to /code-review), and Security (delegated to /security-review, conditional). Synthesises all findings into one human-readable reviews/<task>-review.md via the write-well skill. Use at the end of implement-next-task (AFK) or standalone to review a branch, PR, or work-in-progress. Pass --afk to run as a blocking in-loop gate — returns structured findings in context (no reviews/ document) and flags security findings for human escalation.
+description: >-
+  Review a completed task branch with a panel of parallel agents — Standards (documented
+  conventions + test quality), Spec (faithfulness to the originating task/plan), Bug (delegated to
+  /code-review in Claude Code; /review inside Codex, or an @codex review step in PR workflows),
+  and Security (delegated to /security-review in Claude Code;
+  $codex-security:security-diff-scan after installing the Codex Security plugin in Codex,
+  conditional).
+  Synthesises all findings into one human-readable task review file under reviews/ via the write-well
+  skill. Use at the end of implement-next-task (AFK) or standalone to review a branch, PR, or
+  work-in-progress. Pass --afk to run as a blocking in-loop gate — returns structured findings in
+  context (no reviews/ document) and flags security findings for human escalation.
 ---
 
 # Task Review
@@ -12,7 +22,8 @@ Each lens runs as its **own agent** so contexts don't pollute each other. The le
 a single author **writes**. The author runs the `write-well` skill so the report reads like a
 person wrote it, not a linter dump.
 
-This skill does **not** hunt bugs itself — it delegates that to `/code-review`. Its native value
+This skill does **not** hunt bugs itself — it delegates that to `/code-review` in Claude Code,
+`/review` inside Codex, or an `@codex` review step when running as part of a PR workflow. Its native value
 is the two lenses that skill doesn't cover: **Standards** and **Spec**.
 
 ## The panel
@@ -21,8 +32,8 @@ is the two lenses that skill doesn't cover: **Standards** and **Spec**.
 |------|----------------|-------------|
 | **Standards** | Does the diff follow this repo's *documented* coding standards, including whether the **tests** are meaningful (cover the spec's named edges, not bent/tautological/over-mocked)? | Inline brief (below) |
 | **Spec** | Does the diff faithfully implement the originating spec — nothing missing, no scope creep, nothing mis-built? | Inline brief (below) |
-| **Bug** | Correctness, efficiency, simplification | Invoke `/code-review` |
-| **Security** | Injection, authz, secrets, unsafe I/O | Invoke `/security-review` — **conditional** |
+| **Bug** | Correctness, efficiency, simplification | Invoke `/code-review` in Claude Code; invoke `/review` inside Codex, or use an `@codex` review step in a PR workflow |
+| **Security** | Injection, authz, secrets, unsafe I/O | Invoke `/security-review` in Claude Code; invoke `$codex-security:security-diff-scan` after installing the Codex Security plugin in Codex — **conditional** |
 
 ## Inputs
 
@@ -66,13 +77,12 @@ Send a single message with one `Agent` call per active lens. Use `general-purpos
 agent must return findings as a JSON array matching the **Finding schema** below — nothing else.
 
 - **Standards** and **Spec**: use the inline briefs below.
-- **Bug**: instruct the agent to invoke the `code-review` skill (default effort) on the diff.
-  `/code-review` is a *prompt skill* — invoking it injects a playbook the agent must **execute
-  inline**. The agent runs as a leaf, so it **cannot spawn its own sub-agents**; it must work the
-  playbook itself rather than try to nest agents. Tell it to **return only the JSON Finding array**
-  (the skill emits prose otherwise) and to stamp **`axis: "bug"` on every finding** regardless of
-  the categories `/code-review` uses internally.
-- **Security** (only if step 3 selected it): same pattern, invoking the `security-review` skill,
+- **Bug**: instruct the agent to run `/code-review` in Claude Code, or `/review` inside Codex, on
+  the diff (default effort). In a PR workflow, use an `@codex` review step instead. Tell it to
+  **return only the JSON Finding array** and to stamp **`axis: "bug"` on every finding** regardless
+  of the categories the review uses internally.
+- **Security** (only if step 3 selected it): run `/security-review` in Claude Code, or
+  `$codex-security:security-diff-scan` after installing the Codex Security plugin in Codex,
   stamping **`axis: "security"`** on every finding.
 
 ### 5. Synthesise via `write-well`

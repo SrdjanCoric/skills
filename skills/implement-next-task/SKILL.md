@@ -1,6 +1,11 @@
 ---
 name: implement-next-task
-description: Implement the next uncompleted task from the project's master plan on its own feature branch — all AFK work autonomously, human-in-the-loop work via talk-it-through and manual verification, ending in a PR after user approval. Use when invoked with a task id/path, or when the user asks to build/implement the next task. Pass --afk for autopilot: task-review runs as a blocking in-loop gate, and only genuine [decision]/[verify] items and security findings stop for a human.
+description: >-
+  Implement the next uncompleted task from the project's master plan on its own feature branch —
+  all AFK work autonomously, human-in-the-loop work via talk-it-through and manual verification,
+  ending in a PR after user approval. Use when invoked with a task id/path, or when the user asks
+  to build/implement the next task. Pass --afk for autopilot: task-review runs as a blocking
+  in-loop gate, and only genuine [decision]/[verify] items and security findings stop for a human.
 ---
 
 # Implement Next Task
@@ -194,8 +199,10 @@ job, not this skill's; `sync-main` still does `[>]→[x]` post-merge. Composes w
 
 8. **Generate the task review (AFK), then stop — do not act on it.** Once all AFK work is green,
    invoke the **`task-review`** skill with `base=main` and `spec=` the **verbatim task file plus
-   its referenced decision docs**. It fans out a panel — Standards, Spec, `/code-review`, and
-   `/security-review` when the diff touches security-relevant code — and writes
+   its referenced decision docs**. It fans out a panel — Standards, Spec, `/code-review` in Claude
+   Code or `/review` inside Codex (or an `@codex` review step in a PR workflow), and
+   `/security-review` in Claude Code or `$codex-security:security-diff-scan` after installing the
+   Codex Security plugin in Codex when the diff touches security-relevant code — and writes
    `reviews/<taskName>-review.md`. **`task-review` derives `<taskName>` from the branch, which omits
    the ordinal — so prefix the task number onto the review file: ensure it lands at
    `reviews/NNNN-<taskName>-review.md` (e.g. `reviews/0031-guardrail-terminate-manipulation-review.md`),
