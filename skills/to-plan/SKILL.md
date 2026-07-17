@@ -1,233 +1,209 @@
 ---
 name: to-plan
-description: Turn a source (PRD, decision doc, or the current conversation) into one or more self-contained task files under plans/tasks/, appended as pointers to the project's single master plan. Use when the user wants to break work into tasks, plan a feature, turn a PRD/decision/chat into actionable work, or mentions "tracer bullets". Pass --afk to plan for the autopilot orchestrator — tagging human-in-the-loop work only when strictly necessary.
+description: Turn a PRD, decision document, or conversation into the smallest independently verifiable vertical tasks under plans/tasks/, append them to the project's single local master plan, and wait for user approval before writing. Use to plan features, tracer-bullet work, or agreed decisions for implement-next-task.
 ---
 
 # To Plan
 
-Turn a source — a PRD, a decision doc, or just the current conversation — into **task files**
-and register them in the project's **master plan**. Each task is one vertical slice: a feature
-on its own branch, ending in one PR. There is exactly **one master plan per project**; this
-skill appends to it and never creates a second one.
+Turn the source into self-contained local task files and register them in the project's single
+master plan. Each task is the smallest complete behavior that can be implemented, verified, and
+merged independently on its own branch.
 
 ## Process
 
-### 1. Confirm the source is in context
+### 1. Confirm the source
 
-The source can be a PRD, a decision doc, or the conversation so far. If you're unsure what to
-plan from, ask the user to point you at it.
+Use a PRD, decision document, or the current conversation. If the source is unclear, ask the user
+to identify it. The source type never determines the number of tasks.
 
-### 2. Locate (or bootstrap) the master plan
+### 2. Locate or bootstrap the master plan
 
-Find the project's master plan via the **`CLAUDE.md` "Active plan"** entry.
+Find the master plan through the most specific `AGENTS.md` `Active plan` entry, falling back to
+`CLAUDE.md`.
 
-- **It exists** → you will *append* new task file(s) + pointer(s) to it. Do not recreate it. Do
-  not rewrite its `## Architectural decisions` header unless a genuinely new durable decision
-  emerged — if so, add/amend that one bullet only.
-- **It does not exist** → bootstrap it (see the master-plan template), then register it in
-  `CLAUDE.md` as the Active plan. On an **existing codebase**, derive the
-  `## Architectural decisions` header from the *current* architecture (explore the code first —
-  step 3), and start the `## Tasks` list from the work being planned **now**. Do **not** backfill
-  already-shipped work as done tasks — the plan begins from here, with no history; the existing
-  code is the record of what came before.
+- If it exists, append tasks to it. Do not create another plan.
+- Change an architectural-decision bullet only when the source contains a new durable decision.
+- If no plan exists, explore the codebase first, create the master plan from the template below,
+  and register it in `AGENTS.md` and in `CLAUDE.md` when that file exists.
+- On an existing codebase, describe the current architecture and begin the task list with work
+  planned now. Do not backfill shipped work.
 
 ### 3. Explore the codebase
 
-If you have not already, explore to understand the current architecture, patterns, and
-integration layers — so tasks are grounded and the architectural header stays accurate.
+Inspect the current architecture, domain vocabulary, patterns, integration layers, tests, and
+relevant decision records.
 
-### 4. Draft vertical slices
+Invoke `software-repository-guidelines` in `scope` mode with the source, repository state, and
+proposed work. Load only relevant references. Map current-task requirements to the task where they
+naturally apply. Do not turn unrelated repository hardening into feature work.
 
-Break the source into **tracer bullet** tasks. Each cuts through ALL integration layers
-end-to-end, not a horizontal slice of one layer.
+### 4. Draft the smallest vertical tasks
+
+Break the source into tracer-bullet tasks.
 
 <vertical-slice-rules>
-- Each slice delivers a narrow but COMPLETE path through every layer (schema, API, UI, tests)
-- A completed slice is demoable or verifiable on its own
-- **Make each slice the SMALLEST it can be while staying a complete vertical slice.** The floor: it
-  must still cut through all layers and be demoable on its own. Stay at that floor — every extra
-  behavior folded in costs more to build and review.
-- Split test: if a slice contains two independently demoable behaviors, split it into two slices
-  ordered forward-only. Default to splitting.
-- Each task IS a feature on its own branch. Name it when drafting: `feature/<kebab-slug>`
-- Sizing test: the smallest demoable change mergeable without waiting on later tasks. One PR is the
-  ceiling, not the target.
-- Order tasks **forward-first**: edges normally point to lower ordinals, so the plan reads
-  top-to-bottom as a sensible default sequence. But **eligibility — deps all `[x]` (merged), not list
-  position — is the authority on what's runnable**: the back-patch rule below can add a backward edge
-  (an existing task depending on a newer, higher-ordinal one), so do not rely on "the first unfinished
-  pointer is always runnable." Ordinals are stable IDs, not a runnability guarantee.
-- Do NOT include specific file names or details likely to change as later tasks are built
-- DO include durable decisions: route paths, schema shapes, data model names
+
+- Create one task for each smallest complete, independently verifiable behavior.
+- Cross every layer relevant to that behavior, including its tests or verification. Do not invent
+  schema, API, or UI work when the behavior does not require it.
+- Keep tests and verification in the task whose behavior they prove. Never defer them to a later
+  horizontal task.
+- Make every completed task demoable or verifiable on its own.
+- Apply the split test repeatedly: list the task's observable behaviors. If one can be delivered
+  and verified independently, split it into another vertical task. Continue until removing any
+  behavior would make the remaining task incomplete.
+- Keep each task small enough to understand, implement, verify, and review in one fresh
+  implementation context. If it does not fit comfortably, apply the split test again. Do not split
+  by technical layer to satisfy this limit.
+- Give every task its own `feature/<kebab-slug>` branch and one PR. One PR is a ceiling, not a
+  sizing target.
+- Do not include volatile file names or line numbers. Include durable decisions such as routes,
+  schema shapes, public contracts, and domain model names.
+
 </vertical-slice-rules>
 
-**Record dependencies.** After ordering, give each task a `Depends on` set: the **minimal** list of
-direct predecessors whose output it actually builds on — not "everything before it." A task that
-needs nothing prior is `none`. Edges normally point to lower ordinals, so the plan reads
-top-to-bottom as a sensible default order. These edges are the dependency map: they let
-`implement-next-task --worktree` find a task that isn't blocked by whatever is currently running, and
-they — not list position — decide what's runnable.
+#### Wide mechanical refactors
 
-Two more edge rules:
+Use a non-vertical refactor task only when a cross-cutting mechanical change cannot land green as
+a vertical slice. Plan it as expand, migrate, and contract tasks:
 
-- **Serialize shared-artifact conflicts.** If two tasks both modify the same *durable* shared
-  artifact — a prompt, a rubric, a shared module named in the architectural header — they would
-  collide badly if built in parallel. Add an `after` edge between them so they run sequentially, and
-  annotate the reason in the dependent's field: `Depends on: 0031 (shared: director-prompt)`. (The
-  pointer suffix stays the plain `(after 0031)`.) This only applies to durable artifacts you can name
-  at planning time; do not invent volatile file names.
-- **Back-patch new prerequisites.** When a task you're adding now becomes a prerequisite of an
-  already-listed *unfinished* task, update that existing task's `Depends on` field **and** its pointer
-  `(after …)` suffix. This creates a **backward edge** — the existing lower-ordinal task now depends
-  on the new higher one. That is allowed: eligibility, not ordinal order, governs selection, and the
-  engine simply leaves the existing task blocked until the new prerequisite merges. Do **not** renumber
-  to keep edges forward — ordinals are stable IDs (branches, `done/` files, links reference them).
-  Appending without back-patching silently rots the graph.
+1. Add the new form alongside the old.
+2. Move callers in the smallest green batches the blast radius permits.
+3. Remove the old form after every caller has migrated.
 
-For a multi-task source, **present the proposed edges to the user and confirm before writing** — per
-the project's "don't assume" rule, the graph is not inferred silently.
+Each intermediate task must be mergeable and green. Do not create cleanup or prefactoring tasks
+merely because they would be convenient.
 
-From a fat PRD this yields several tasks; from a decision doc or a chat it's usually **one**.
+#### Dependencies
 
-### 5. Break each task into AFK and human-in-the-loop work
+Give each task the minimal set of direct predecessors whose merged output it needs. Use `none` when
+it needs no predecessor. Eligibility comes from dependencies, not list position: every dependency
+must be `[x]` before the task can start.
 
-*(Under `--afk`, tighten this hard — see **AFK mode** below.)*
+- Serialize tasks that change the same durable shared artifact by adding a direct dependency and
+  naming the artifact in the dependent task.
+- If a new task becomes a prerequisite of an unfinished existing task, update the existing task's
+  `Depends on` field and master-plan pointer. Do not renumber stable task identifiers.
 
-- **AFK tasks** — everything the agent can implement *and verify* autonomously: code, schema,
-  migrations, tests, automated checks. The **default bucket**, implemented via the **tdd** skill.
-  Phrase so the test comes first where it makes sense.
-- **Human-in-the-loop tasks** — only two kinds:
-  - `[decision]` — needs mutual agreement before/while building. Resolved via **talk-it-through**.
-  - `[verify]` — genuinely cannot be verified automatically. Each must state *why*.
+### 5. Confirm the breakdown before writing
 
-<afk-bias-rule>
-Bias hard toward AFK. A task goes human-in-the-loop only if it truly cannot be done or verified
-autonomously. If a verification can become a test, script, or automated check — make it AFK. A
-task with zero human-in-the-loop items is a good task. Don't manufacture decisions the source or
-architectural header already answers.
-</afk-bias-rule>
+Present every proposed task as a numbered list. For each task show:
 
-### 6. Write the task file(s)
+- title;
+- the independently verifiable outcome;
+- adjacent behavior deliberately excluded;
+- direct dependencies;
+- automated verification, or the required manual verification;
+- why another split would make the task incomplete.
 
-For each slice, write a **self-contained** task file. The next ordinal is `max(ordinal across
-plans/tasks/ and plans/tasks/done/) + 1`, zero-padded to four digits. Filename:
-`plans/tasks/NNNN-<kebab-slug>.md`.
+Ask whether tasks should be split, merged, reordered, or re-scoped. Wait for explicit approval
+before creating or modifying any plan or task file, including when only one task is proposed.
 
-Self-contained means the file carries everything the implementer needs — the relevant user
-stories and acceptance criteria distilled from the source — so implementation never has to reach
-back to the PRD. Reference durable decisions by pointing at the master plan header or a decision
-doc; don't duplicate them.
+### 6. Separate implementation work from human checkpoints
+
+- **Implementation work** is everything the agent can implement and verify autonomously. Use the
+  `tdd` skill and phrase behavior work test-first where appropriate.
+- **Human checkpoints** are limited to:
+  - `[decision]` for an unresolved product, architecture, or scope choice, handled through
+    `talk-it-through`;
+  - `[verify]` when the result cannot be verified automatically;
+  - `[confirm-db]` for real, shared, destructive, persistent, or ambiguous database or data work;
+  - `[confirm-security]` for changes to authentication, authorization, sessions, secrets,
+    cryptography, dependency trust, CI, sandboxing, or another trust boundary.
+
+Automate verification whenever possible. A `[verify]` item must state why automation is impossible,
+the exact steps the user must perform, the expected result, and what indicates failure. Manual
+verification blocks task completion until the user confirms it passed.
+
+### 7. Write the approved task files
+
+Use the next ordinal after the maximum ordinal in `plans/tasks/` and `plans/tasks/done/`, padded to
+four digits. Write `plans/tasks/NNNN-<kebab-slug>.md`.
+
+Each task must contain the relevant source requirements and acceptance criteria so a fresh
+implementer does not need the PRD or neighboring tasks. Point to durable decisions instead of
+duplicating them.
+
+For Software Repository Guidelines, name only the relevant reference files, applicable
+requirements, and expected proof.
 
 <task-file-template>
 # Task NNNN: <Title>
 
 **Branch**: `feature/<kebab-slug>`
-**Depends on**: <comma-separated ordinals of direct predecessors, or `none`>
-**Source**: <PRD / decision doc / "talk-it-through <date>"> · **User stories**: <list>
+**Depends on**: <direct predecessor ordinals, or `none`>
+**Source**: <PRD, decision document, or conversation date> · **User stories**: <list>
 
 ## What to build
 
-A concise description of this vertical slice — the end-to-end behavior, not layer-by-layer
-implementation.
+<One smallest complete, independently verifiable behavior described end to end.>
 
-## AFK tasks
+## Software Repository Guidelines
 
-- [ ] Task 1
-- [ ] Task 2
+**Applicable references**: <only relevant references>
 
-## Human-in-the-loop tasks
+- [ ] <applicable requirement and expected repository, command, or CI proof>
 
-- [ ] [decision] <question needing mutual agreement> (talk-it-through)
-- [ ] [verify] <what to check manually> — <why it can't be automated>
+## Implementation work
 
-(Omit this section if the task has none — that's a good task.)
+- [ ] <work item>
+
+## Human checkpoints
+
+- [ ] [decision] <question requiring shared understanding> (`talk-it-through`)
+- [ ] [verify] <manual steps> · Expected: <result> · Failure: <failure signal> · Reason:
+      <why automation is impossible>
+- [ ] [confirm-db] <database or data action requiring approval>
+- [ ] [confirm-security] <trust-boundary action requiring approval>
+
+(Omit `Human checkpoints` when none apply.)
 
 ## Acceptance criteria
 
-- [ ] Criterion 1
-- [ ] Criterion 2
+- [ ] <criterion proving the behavior>
 </task-file-template>
 
-### 7. Append the pointer(s)
+### 8. Append task pointers
 
-Add one line per new task to the master plan's `## Tasks` list, in execution order. Mirror the task's
-`Depends on` onto the pointer as an `(after …)` suffix so the plan itself is the readable dependency
-map; omit the suffix when `Depends on` is `none`:
+Append one pointer per approved task to the master plan. Mirror direct dependencies in an
+`(after ...)` suffix and omit the suffix for `none`:
 
+```markdown
+- [ ] NNNN · <Title> → tasks/NNNN-<slug>.md
+- [ ] NNNN · <Title> (after NNNN[, NNNN]) → tasks/NNNN-<slug>.md
 ```
-- [ ] NNNN · <Title> (after NNNN[, NNNN]) → tasks/NNNN-<kebab-slug>.md
-- [ ] NNNN · <Title> → tasks/NNNN-<kebab-slug>.md          # no prerequisites
-```
 
-Tell the user which task files you created and where they sit in the plan order.
+Tell the user which task files were created and where they sit in the plan.
 
----
-
-## AFK mode (`--afk`)
-
-`--afk` plans for the autopilot orchestrator, which builds each task with
-`implement-next-task --afk` and merges without a human on the happy path. It changes only
-**step 5's bucketing**: bias to AFK even harder than the standard `afk-bias-rule`. A task earns a
-`[verify]` or `[decision]` tag *only* when it falls in the **must-be-human set**; everything else
-is forced AFK.
-
-The must-be-human set — the only reasons an AFK run may stop for a person:
-
-- **Destructive data** — schema migrations, bulk deletes/backfills, anything that mutates
-  existing data irreversibly.
-- **Trust boundary** — auth/authz, sessions, crypto, or any code that handles real secrets.
-- **Money** — payments, billing, quotas.
-- **Breaking contract** — public API / interface changes that break existing callers.
-- **The cage** — CI/CD config, the container/firewall/sandbox definition, dependency additions or
-  bumps, MCP config. The autopilot must never widen its own sandbox unreviewed.
-- **Final acceptance** — the "is the app actually right" sign-off, only when it genuinely can't be
-  an automated eval.
-
-Two hard rules under `--afk`:
-
-- **Resolve every `[decision]` at plan time.** An AFK run must not stop mid-task to interview the
-  user. A `[decision]` survives into the plan only if it truly cannot be settled now — prefer to
-  settle it here and record it in the architectural header or the task file.
-- **A `[verify]` must name a must-be-human reason above.** If a check can become a test, script, or
-  automated eval, it is AFK. No "I'd feel better eyeballing it" exceptions.
-
----
-
-## Master-plan template (bootstrap only — step 2)
+## Master-plan template
 
 <master-plan-template>
 # Plan: <Project Name>
 
-> Source PRD: <brief identifier or link>
+> Source: <brief identifier or link>
 
-This is the project's master plan: a durable architectural header plus an ordered list of task
-pointers. Each task is one feature on its own branch, ending in a PR. Task bodies live in
-`plans/tasks/`; finished tasks move to `plans/tasks/done/`.
+This is the project's local master plan. Task bodies live in `plans/tasks/`; merged tasks move to
+`plans/tasks/done/`.
 
 ## Workflow
 
-- New work is added by the `to-plan` skill: a self-contained task file under
-  `plans/tasks/NNNN-<slug>.md` plus a pointer below. It appends; it never creates a second plan.
-- `implement-next-task` takes the first eligible pointer (or an explicit task argument), builds it
-  on its branch — AFK via `tdd`, `[decision]` via `talk-it-through`, `[verify]` paused for manual
-  confirmation — runs `task-review`, then opens the PR after approval and flips the pointer to `[>]`.
-- A pointer has four states: `[ ]` todo · `[~]` in progress (claimed) · `[>]` done, PR open,
-  awaiting merge · `[x]` merged to `main`. `sync-main` flips `[>]→[x]` and moves the task file to
-  `tasks/done/` once the PR merges.
-- Pointers carry their direct prerequisites as an `(after NNNN, …)` suffix (none = no suffix). A
-  task is selectable only once every ordinal in its `(after …)` list is **`[x]` (merged)** — so a
-  dependent never branches off `main` before its prerequisite is actually on `main`.
-  `implement-next-task --worktree` uses this to pick the first task not blocked by in-progress work,
-  or reports "no independent task" when every remaining task is blocked.
+- `to-plan` adds approved self-contained task files and pointers.
+- `implement-next-task` takes the first eligible task, claims it as `[~]`, implements it through
+  `tdd`, uses `talk-it-through` when the task or an unexpected obstacle requires a decision,
+  updates the README when the current application state changed, runs `task-review`, proves the
+  behavior, and invokes `create-pr` after user approval.
+- `[ ]` means ready, `[~]` in progress, `[>]` complete with a CI-green PR awaiting merge, and `[x]`
+  merged into `main`.
+- `sync-main` verifies and merges the PR, synchronizes local `main`, cleans the merged branch,
+  changes `[>]` to `[x]`, and moves the task to `tasks/done/`.
+- A task is eligible only when every ordinal in its `(after ...)` list is `[x]`.
+- Run one `implement-next-task` workflow at a time in the current checkout.
 
 ## Architectural decisions
-
-Durable decisions that apply across all tasks:
 
 - **Routes**: ...
 - **Schema**: ...
 - **Key models**: ...
-- (add/remove sections as appropriate)
 
 ---
 

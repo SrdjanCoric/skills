@@ -1,76 +1,123 @@
 ---
 name: create-pr
-description: Create a PR from current changes with an auto-generated description. Use when the user wants to create a pull request, open a PR, or mentions "create pr". Takes an optional feature name as an argument.
+description: Create or update a pull request from the current branch, wait for CI, and invoke diagnose for in-scope CI failures. Use when the user wants to open or prepare a PR; stop after the current head is CI-green and never merge or invoke sync-main.
 ---
 
 # Create Pull Request
 
-Create a pull request for the current changes. If the user provided a feature name, use it as the feature context; otherwise infer it from the changes.
+Commit the current unit of work, push its branch, open or update its PR, and wait for CI. Stop when
+the current PR head is ready to merge. Do not merge the PR or invoke `sync-main`.
 
-## Gather current state
+## Inputs
 
-Run these first to understand where things stand:
+Accept an optional feature name and optional evidence from `implement-next-task`:
 
-- `git branch --show-current` - current branch
-- `git status --short` - working tree status
-- `git diff --cached --stat` and `git diff --stat` - staged and unstaged changes
-- `git log main..HEAD --oneline` (fall back to `origin/main..HEAD`) - commits not on main
-- `git diff main...HEAD` (fall back to `origin/main...HEAD`) - full diff from main
+- task-review result;
+- repository-guideline proof;
+- automated and manual verification proof;
+- accepted security risks and the user's reasons.
 
-## Task
+## Process
 
-Follow these steps:
+### 1. Gather current state
 
-1. **Review the changes**
-   - Analyze the diff to understand what was modified
-   - Identify the main purpose of the changes
-   - Note any breaking changes or dependencies
+Run:
 
-2. **Stage any unstaged changes** (if appropriate)
-   - If there are unstaged changes relevant to this feature, stage them
-   - If unstaged changes are unrelated, leave them for a separate PR
+```sh
+git branch --show-current
+git status --short
+git diff --cached --stat
+git diff --stat
+git log main..HEAD --oneline || git log origin/main..HEAD --oneline
+git diff main...HEAD || git diff origin/main...HEAD
+```
 
-3. **Create a commit** (if needed)
-   - If there are staged but uncommitted changes, create a commit
-   - Use conventional commit format: `type(scope): description`
-   - **IMPORTANT**: Never mention Claude Code or any AI assistant in commit messages
+Confirm the current branch is not `main`. Identify the observable result, dependencies, and
+material risks in the diff.
 
-4. **Push the branch**
-   - Ensure all commits are pushed to origin
-   - Create tracking branch if needed
+When the caller supplies managed review or repository-guideline evidence, confirm there is no
+unresolved supported finding, security decision, or current-task proof gap. Return to the caller
+when supplied evidence is incomplete. Standalone PR creation does not invent missing managed
+evidence.
 
-5. **Generate PR content**
+### 2. Stage and commit
 
-   Invoke the `write-well` skill first and write all PR prose (the description and any PR
-   comments) following its voice and anti-AI checklist.
+Stage only changes that belong to the PR. Include related README changes. Leave unrelated changes
+unstaged. Never stage secrets, credentials, local environment files, or unrelated plan files.
 
-   Title format: `type(scope): brief description`
+Commit when needed using repository conventions, falling back to `type(scope): description`.
+Never mention an AI assistant in a commit message.
 
-   Description format:
-   ```
-   # Overview
-   [Paragraph explaining what was done at a high level. Can include numbered points for major components/features added. Use **bold** for emphasis on key items.]
+### 3. Push the branch
 
-   ## Key Changes
-   **path/to/file1.ts**
-   - [Description of what was changed in this file]
+Push all commits to `origin` and create upstream tracking when needed.
 
-   **path/to/file2.ts**
-   - [Description of what was changed in this file]
+### 4. Write the PR
 
-   **path/to/file3.ts**
-   - [Description of what was changed in this file]
-   ```
+Invoke `write-well` before writing the title, description, or comments. Follow repository title
+conventions, falling back to `type(scope): brief description`.
 
-   Guidelines for the description:
-   - **Overview**: Write a clear summary of the overall purpose. If multiple components were added, use numbered list with bold labels (e.g., `1. **Feature name** - description`)
-   - **Key Changes**: List each modified file with its full path in bold, followed by bullet points describing what was changed in that file. Be specific about new types, functions, configurations, or modifications made.
-   - **IMPORTANT**: Never include any mention that the PR was generated with Claude Code or any AI assistant. The PR should appear as a normal human-written PR.
+Use this body:
 
-6. **Create the PR**
-   - Use `gh pr create` with the generated title and body
-   - Set appropriate labels if available
-   - Request reviewers if specified in project settings
+```markdown
+## Summary
+<What the current branch delivers and why.>
 
-7. **Output the PR URL**
-   - Provide the link to the newly created PR
+## Changes
+- <Behavior or capability now present>
+
+## Verification
+- <Command or manual proof and result>
+
+## Risk
+<Applicable security, data, compatibility, deployment, and rollback risks, or "Low" with a reason.>
+```
+
+Describe the repository's resulting behavior, not the agent's process. Include exact verification
+commands and results. Include every accepted security risk and the user's reason in `Risk`. Do not
+mention an AI assistant.
+
+### 5. Open or update the PR
+
+Use `gh pr create` or the repository's documented equivalent. Add configured labels and reviewers.
+If the branch already has an open PR, update and reuse it.
+
+Capture the PR URL, number, head branch, base branch, and head SHA. Use `main` as the base unless
+the user explicitly chose another branch.
+
+### 6. Wait for CI
+
+Wait for all checks on the current head to reach a terminal state. Use
+`gh pr checks <pr> --watch --interval 10` or the repository's documented equivalent. Then confirm:
+
+- the head SHA has not changed;
+- no check is pending or queued;
+- required checks passed;
+- no failure or unexpected cancellation remains.
+
+If the head changes, wait for the new head. If the repository has no CI and no required checks,
+record that state and continue.
+
+### 7. Diagnose CI failures
+
+When a check fails or is unexpectedly cancelled:
+
+1. Capture the check names, URLs, annotations, and failed logs.
+2. Invoke `diagnose` with the PR, head SHA, failing command, and evidence.
+3. If diagnosis produces an in-scope fix, verify it, commit it, push it, and return to the CI wait.
+4. If credentials, unavailable infrastructure, policy, or another external condition blocks the
+   PR, report the blocker and stop.
+
+Never bypass branch protection, weaken tests, or merge while CI is failing, pending, or stale.
+
+### 8. Return the ready PR
+
+After CI passes for the current head, return:
+
+- PR URL and number;
+- base branch, head branch, and head SHA;
+- CI result;
+- verification evidence;
+- accepted security risks included in the PR.
+
+Stop without merging. The user invokes `sync-main` separately when ready.

@@ -46,6 +46,13 @@ RIGHT (vertical):
 
 When exploring the codebase, use the project's domain glossary so that test names and interface vocabulary match the project's language, and respect ADRs in the area you're touching.
 
+If the caller supplies a `software-repository-guidelines` result containing
+`references/02-testing.md`, apply its current-task requirements and expected proof. Otherwise invoke
+`software-repository-guidelines` in `implement` mode with testing as the affected capability and
+load that reference. Load another guideline reference only when the TDD work crosses that surface.
+This skill still owns the red-green-refactor method; the guideline skill supplies repository-level
+testing requirements, not an alternative implementation workflow.
+
 Before writing any code:
 
 - [ ] Confirm with user what interface changes are needed

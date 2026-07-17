@@ -1,7 +1,6 @@
 ---
 name: handoff
 description: Capture a focused slice of the current work — a bug, a newly-discovered piece of work, or some other context — into a handoff document a fresh agent can pick up and continue without re-deriving everything. Requires an argument naming what the handoff is about.
-argument-hint: "What is this handoff about? (a bug, a new direction, a task to continue)"
 ---
 
 # Handoff

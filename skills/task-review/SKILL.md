@@ -1,176 +1,188 @@
 ---
 name: task-review
-description: >-
-  Review a completed task branch with a panel of parallel agents — Standards (documented
-  conventions + test quality), Spec (faithfulness to the originating task/plan), Bug (delegated to
-  /code-review in Claude Code; /review inside Codex, or an @codex review step in PR workflows),
-  and Security (delegated to /security-review in Claude Code;
-  $codex-security:security-diff-scan after installing the Codex Security plugin in Codex,
-  conditional).
-  Synthesises all findings into one human-readable task review file under reviews/ via the write-well
-  skill. Use at the end of implement-next-task (AFK) or standalone to review a branch, PR, or
-  work-in-progress. Pass --afk to run as a blocking in-loop gate — returns structured findings in
-  context (no reviews/ document) and flags security findings for human escalation.
+description: Review and remediate a completed task branch against repository standards, the originating task or spec, correctness, and conditional security checks. Use from implement-next-task or standalone; invocation authorizes automatic fixes for current-diff non-security findings, while every security finding requires a plain-English user decision.
 ---
 
 # Task Review
 
-Fan out a panel of review agents over the diff between `HEAD` and a base, then synthesise their
-findings into a single human-readable file at `reviews/<taskName>-review.md`.
+Review the diff between `HEAD` and a fixed base with independent Standards, Spec, Bug, and
+conditional Security lenses. Fix supported non-security findings attributable to the current diff,
+verify the fixes, and rerun the panel for at most two remediation passes.
 
-Each lens runs as its **own agent** so contexts don't pollute each other. The lenses **find**;
-a single author **writes**. The author runs the `write-well` skill so the report reads like a
-person wrote it, not a linter dump.
-
-This skill does **not** hunt bugs itself — it delegates that to `/code-review` in Claude Code,
-`/review` inside Codex, or an `@codex` review step when running as part of a PR workflow. Its native value
-is the two lenses that skill doesn't cover: **Standards** and **Spec**.
-
-## The panel
-
-| Lens | What it checks | How it runs |
-|------|----------------|-------------|
-| **Standards** | Does the diff follow this repo's *documented* coding standards, including whether the **tests** are meaningful (cover the spec's named edges, not bent/tautological/over-mocked)? | Inline brief (below) |
-| **Spec** | Does the diff faithfully implement the originating spec — nothing missing, no scope creep, nothing mis-built? | Inline brief (below) |
-| **Bug** | Correctness, efficiency, simplification | Invoke `/code-review` in Claude Code; invoke `/review` inside Codex, or use an `@codex` review step in a PR workflow |
-| **Security** | Injection, authz, secrets, unsafe I/O | Invoke `/security-review` in Claude Code; invoke `$codex-security:security-diff-scan` after installing the Codex Security plugin in Codex — **conditional** |
+Invocation authorizes modifications to the current branch for non-security remediation. Never
+write a review document or create review scaffolding.
 
 ## Inputs
 
-This skill accepts two optional inputs so it works both AFK and standalone:
+Accept these optional inputs:
 
-- `base` — the fixed point to diff against. Diff is always three-dot: `git diff <base>...HEAD`.
-- `spec` — the originating contract (path or verbatim text).
+- `base`: the fixed point for a three-dot diff, such as `main`, a branch, or a commit;
+- `spec`: the originating task, plan, or specification as a path or verbatim text;
+- `repository-guidelines`: the implement-mode result and proof when supplied by a caller;
+- `task`: the local task-file path when one exists.
 
-**When a caller injects both (the AFK path, e.g. `implement-next-task`):** use them, ask
-nothing — run fully unattended.
+When `implement-next-task` supplies the inputs, use them without asking. When invoked standalone:
 
-**When invoked standalone (`/task-review`):** self-resolve.
-- `base`: if not given, ask "Review against what — a branch, a commit, or `main`?" Don't proceed
-  without it.
-- `spec`, in order: (1) issue refs in commit messages, fetched however the repo documents;
-  (2) a path passed as an argument; (3) a PRD/plan under `plans/`, `docs/`, or `specs/` matching
-  the branch/feature; (4) ask the user. If there genuinely is none, the Spec lens reports
-  "no spec available" and is skipped.
-- `--afk` — blocking-gate mode for the orchestrator: return findings in context, write no file.
-  See **AFK mode**.
+1. Ask for `base` if it is absent.
+2. Resolve `spec` from a supplied path, issue reference in commits, or matching plan or spec file.
+3. If no spec exists, skip the Spec lens and report that fact in the final in-context result.
 
-## Process
+## Review loop
 
-### 1. Resolve the diff and `taskName`
-Capture `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`. Derive `taskName` from
-the branch name with any leading `feature/` stripped (`feature/foo-bar` → `foo-bar`).
+### 1. Resolve the diff
 
-### 2. Ensure `reviews/` is gitignored
-The review file is ephemeral, branch-scoped scaffolding. If the project's `.gitignore` doesn't
-already ignore `reviews/`, append it. Never commit the review.
+Confirm the base resolves. Capture:
+
+```sh
+git diff <base>...HEAD
+git log <base>..HEAD --oneline
+```
+
+Stop on a bad base or empty diff. Record the current branch and head SHA so remediation never
+silently changes the review target.
+
+### 2. Resolve repository requirements
+
+Invoke `software-repository-guidelines` in `review` mode with the spec, actual diff, repository
+state, supplied implement-mode result, and claimed proof. Select relevant references independently.
+If the skill is unavailable, return a blocker finding instead of skipping it.
+
+Review only current-task requirements and established repository standards. Do not turn unrelated
+repository-health gaps into findings.
 
 ### 3. Decide whether Security runs
-Scan the diff (paths + content) for security-relevant signals: auth/session, secret/token/key
-handling, input parsing/deserialization, SQL/shell/subprocess, network or external I/O,
-prompt/guardrail code, file uploads, crypto. **Any** hit → include the Security agent. Otherwise
-skip it and record the skip in the report (see Synthesis). A silent skip must never read as
-"security passed."
 
-### 4. Fan out — one agent per lens, in parallel
-Send a single message with one `Agent` call per active lens. Use `general-purpose` agents. Every
-agent must return findings as a JSON array matching the **Finding schema** below — nothing else.
+Run the Security lens when paths or diff content touch authentication, authorization, sessions,
+secrets, tokens, input parsing, deserialization, SQL, shell or subprocess execution, network I/O,
+file uploads, cryptography, sandboxing, CI trust boundaries, or prompt and guardrail code.
 
-- **Standards** and **Spec**: use the inline briefs below.
-- **Bug**: instruct the agent to run `/code-review` in Claude Code, or `/review` inside Codex, on
-  the diff (default effort). In a PR workflow, use an `@codex` review step instead. Tell it to
-  **return only the JSON Finding array** and to stamp **`axis: "bug"` on every finding** regardless
-  of the categories the review uses internally.
-- **Security** (only if step 3 selected it): run `/security-review` in Claude Code, or
-  `$codex-security:security-diff-scan` after installing the Codex Security plugin in Codex,
-  stamping **`axis: "security"`** on every finding.
+Otherwise skip Security and include `security_status: skipped-no-relevant-surface` in the final
+result. A skip is not a security pass.
 
-### 5. Synthesise via `write-well`
-Spawn one synthesis author agent. Give it every lens's findings and instruct it to **load the
-`write-well` skill** (via the Skill tool) and author the whole report through it. The author obeys
-the Synthesis rules below and returns the finished markdown.
+### 4. Run independent review lenses
 
-### 6. Write the file
-Write the author's output to `reviews/<taskName>-review.md` (overwrite if it exists). Tell the
-user where it is.
+Run each active lens in its own agent and require only a JSON Finding array in response.
 
-## AFK mode (`--afk`)
+| Lens | Review target |
+|------|---------------|
+| Standards | Documented repository standards, applicable Software Repository Guidelines, and meaningful tests |
+| Spec | Missing, partial, incorrect, or out-of-scope behavior against the task or spec |
+| Bug | Correctness, efficiency, and unnecessary complexity through `/code-review` in Claude Code or `/review` in Codex |
+| Security | Exploitable trust-boundary failures through `/security-review` in Claude Code or `$codex-security:security-diff-scan` in Codex |
 
-Called by `implement-next-task --afk`, `task-review` is a **blocking in-loop gate**, not a document
-to be read. Steps 1, 3, and 4 run unchanged (resolve the diff, decide whether Security runs, fan
-out the panel). Steps 2, 5, and 6 change:
+Tell every review agent to inspect the diff directly, avoid invoking `task-review`, avoid spawning
+more agents, and return findings with concrete evidence. Run the active lenses in parallel when the
+environment supports it.
 
-- **Skip step 2** — nothing is written, so there's no `reviews/` file to gitignore.
-- **Replace steps 5–6** — do **not** synthesise via `write-well` and do **not** write a file.
-  Instead, dedupe the lenses' findings (merging identical ones, noting which lens flagged each) and
-  **return the raw JSON Finding array in context** to the caller. No prose, no `reviews/` document.
+### 5. Normalize findings
 
-The caller acts on the findings immediately (that's the point of AFK): `blocker`/`major` findings on
-`bug`, `standards` (test-quality), and `spec` get fixed and the review re-run; **any `security`
-finding is never auto-fixed — it's a human escalation.** So preserve every finding's `axis` and
-`severity` exactly, and never drop or down-rank a `security` finding to keep the gate flowing. If
-Security was skipped (step 3 found no security-relevant surface), say so in the returned payload —
-a silent absence must never read as "security passed."
+Dedupe identical findings while retaining every lens that reported them. Reject unsupported claims
+that do not satisfy the Finding schema. Do not down-rank or discard a security finding to keep the
+workflow moving.
+
+Separate the result into:
+
+- non-security findings caused by the current diff;
+- security findings;
+- unrelated pre-existing problems, which are reported as out of scope and never fixed here.
+
+### 6. Resolve security findings
+
+Before changing security-sensitive code, handle every new security finding with the user. Invoke
+`write-well` and explain in plain English:
+
+- what the risk is;
+- how it could occur in a realistic scenario;
+- the likely consequences;
+- how exposed or probable it appears;
+- what a fix would change.
+
+Wait for an explicit decision on each finding:
+
+- **Fix**: add the approved security finding to the remediation set.
+- **Accept**: record the user's reason in the local task file when one exists. Without a task file,
+  return the accepted risk to the caller so `create-pr` can include it in the PR `Risk` section.
+
+Every unresolved security finding blocks completion. An accepted finding remains visible in the
+final result but does not block a later pass when its evidence is unchanged.
+
+### 7. Remediate and rereview
+
+Fix every supported non-security finding attributable to the current diff without prompting the
+user. Also fix security findings the user explicitly approved. Use `tdd` for behavioral defects
+when a testable seam exists. Run the focused tests and checks required by the affected files.
+
+Rerun the full applicable panel after remediation. Allow no more than two remediation and rereview
+passes after the initial review.
+
+- If the panel is clean apart from accepted security risks, return success.
+- If a new security finding appears, return to the security decision step.
+- If non-security findings remain after the second remediation pass, stop. Explain what remains,
+  why the loop did not converge, and ask the user how to proceed.
+- If a fix changes the branch head, record the new head SHA in the result.
 
 ## Finding schema
 
-Every finding, every lens, the same shape:
+Every finding uses this shape:
 
 ```json
 {
   "axis": "standards | spec | bug | security",
   "severity": "blocker | major | minor | nit",
   "location": "path/to/file.py:42",
-  "claim": "One sentence: what is wrong.",
-  "evidence": "The citation backing the claim (see below).",
+  "claim": "One sentence describing the problem.",
+  "evidence": "The rule, spec text, or failing scenario that proves the claim.",
   "suggestion": "Optional one-line fix direction."
 }
 ```
 
-**`evidence` is mandatory — no finding without a citation:**
-- Standards → the documented rule + where it's written (e.g. `CLAUDE.md`: "never use `any`").
-- Spec → the quoted spec/plan line the code fails to meet.
-- Bug / Security → the concrete failing scenario (inputs → wrong outcome).
+Evidence is mandatory:
 
-**Severity:** `blocker` = must fix before merge (real bug, security hole, missing spec
-requirement); `major` = hard standards violation or partial spec — should fix; `minor` = judgment
-call; `nit` = cosmetic.
+- Standards findings cite the rule and its source.
+- Spec findings quote the task or spec requirement.
+- Bug and Security findings give a concrete input-to-outcome scenario.
 
-## Synthesis rules
-
-- **Lead with a short human summary**: a sentence or two of plain prose, then counts per lens and
-  the single worst finding.
-- **Keep lenses as distinct labeled sections** — `## Standards`, `## Spec`, `## Bug`,
-  `## Security`. Rank by severity **within** a section, **never across** — one lens must not mask
-  another.
-- **Dedupe allowed**: merge identical findings flagged by more than one lens, noting which.
-- **No silent drops**: if you merge or demote a finding, say so. A finding never just disappears.
-- **If Security was skipped**, add a one-line `## Security` note: "Skipped — no security-relevant
-  surface touched." If a lens found nothing, say "No findings" — don't omit the section.
-- Human voice throughout (that's why the author runs `write-well`). No filler, no restating the
-  obvious, no inventing severity to look thorough.
+Use `blocker` for a must-fix bug, security hole, or missing requirement; `major` for a hard standard
+violation or partial requirement; `minor` for a judgment call; and `nit` for cosmetic issues. All
+supported non-security severities are remediated automatically.
 
 ## Lens briefs
 
-**Standards agent** — give it the diff command, the commit list, and the repo's standards docs
-(`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, `CONTEXT.md`, `docs/adr/`, any `STYLE.md` /
-`STANDARDS.md`, and config files like `eslint.config.*` / `tsconfig.json` / `biome.json`):
+### Standards
 
-> Read the standards docs, then the diff. Report every place the diff violates a **documented**
-> standard — cite the rule and where it's written. Separately, judge the **tests** in the diff: do
-> they verify real behaviour through public interfaces, cover the edges the spec named, and avoid
-> being bent/tautological/over-mocked? Skip anything tooling already enforces (formatting,
-> lint-autofixable). Return only the JSON Finding array, `axis: "standards"`.
+Give the agent the diff command, commits, review-mode repository-guideline result, and repository
+standards files. Ask it to report documented violations, missed current-task requirements, and
+tests that fail to verify real behavior through public interfaces. Skip formatting and other issues
+already enforced by tooling.
 
-**Spec agent** — give it the diff command, the commit list, and the spec (path or text):
+### Spec
 
-> Read the spec, then the diff. Report: (a) requirements the spec asked for that are missing or
-> partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that
-> look implemented but built wrong. Quote the spec line for each finding. Return only the JSON
-> Finding array, `axis: "spec"`.
+Give the agent the diff command, commits, and spec. Ask it to report missing or partial
+requirements, scope creep, and behavior built incorrectly. Require a quote from the spec for every
+finding.
 
-## Why a panel of separate agents
+### Bug
 
-A change can pass one lens and fail another — clean conventions but the wrong behaviour, or exactly
-what the spec asked but a security hole. Separate agents keep each judgment independent; keeping the
-sections distinct in the report stops one from masking the rest.
+Ask the agent to run the environment's code-review capability on the diff. Require concrete failing
+scenarios and stamp `axis: "bug"` on every finding.
+
+### Security
+
+Ask the agent to run the environment's security-review capability on the diff. Require concrete
+attack or misuse scenarios and stamp `axis: "security"` on every finding.
+
+## Final in-context result
+
+Return no document. Return a concise structured result containing:
+
+- base and reviewed head SHA;
+- references and standards checked;
+- security status;
+- findings fixed by axis and severity;
+- remediation-pass count;
+- tests and checks run;
+- accepted security risks and user reasons;
+- remaining blockers, if any.
+
+Do not report success while an unresolved security finding or supported non-security finding
+remains.
