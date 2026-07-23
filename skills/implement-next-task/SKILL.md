@@ -171,13 +171,15 @@ until a PR exists and its CI is green.
 Summarize the completed task and ask the user to approve opening the PR. Do not invoke `create-pr`
 without explicit approval.
 
-After approval, invoke `create-pr` with the task-review result, repository-guideline evidence,
-verification proof, and accepted security risks. `create-pr` commits, pushes, opens or updates the
-PR, and waits for CI. It does not merge.
+After approval, invoke `create-pr` with the task path, task-review result, repository-guideline
+evidence, verification proof, and accepted security risks. `create-pr` opens or updates the PR and
+waits for CI. After a green run, it changes the managed task pointer from `[~]` to `[>]` and pushes
+the marker commit. It waits for CI on the new head and does not merge.
 
-When `create-pr` reports successful CI for the current head, change the pointer from `[~]` to `[>]`.
-Leave the task file under `plans/tasks/`. If PR creation or CI does not succeed, leave the pointer
-at `[~]`. The user invokes `sync-main` separately to merge and close the task.
+Treat PR creation as complete only when `create-pr` returns a CI-green current head and confirms the
+task pointer is `[>]`. Leave the task file under `plans/tasks/`. If PR creation or CI does not
+succeed, the pointer must remain `[~]`. The user invokes `sync-main` separately to merge and close
+the task.
 
 ## Rules
 
