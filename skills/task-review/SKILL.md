@@ -1,13 +1,14 @@
 ---
 name: task-review
-description: Review and remediate a completed task branch against repository standards, the originating task or spec, correctness, and conditional security checks. Use from implement-next-task or standalone; invocation authorizes automatic fixes for current-diff non-security findings, while every security finding requires a plain-English user decision.
+description: Review and remediate a completed task branch with one independent review panel, one batched remediation, and targeted closure verification instead of full-panel reruns. Use from implement-next-task or standalone when review quality must be preserved without repeated review-fix-review cycles.
 ---
 
 # Task Review
 
-Review the diff between `HEAD` and a fixed base with independent Standards, Spec, Bug, and
-conditional Security lenses. Fix supported non-security findings attributable to the current diff,
-verify the fixes, and rerun the panel for at most two remediation passes.
+Review the diff between `HEAD` and a fixed base with independent Standards, Spec, conditionally
+applicable Bug, and conditional Security lenses. Run the panel once. Batch supported findings into one remediation,
+then close those findings with focused tests and targeted evidence checks. Do not rerun the full
+panel automatically.
 
 Invocation authorizes modifications to the current branch for non-security remediation. Never
 write a review document or create review scaffolding.
@@ -18,16 +19,19 @@ Accept these optional inputs:
 
 - `base`: the fixed point for a three-dot diff, such as `main`, a branch, or a commit;
 - `spec`: the originating task, plan, or specification as a path or verbatim text;
-- `repository-guidelines`: the implement-mode result and proof when supplied by a caller;
-- `task`: the local task-file path when one exists.
+- `task`: the local task-file path when one exists;
+- `change-class`: `plan-only`, `documentation-only`, `dependencies`, `configuration`, `code`, or `mixed`;
+- `validation-tier`: `documentation`, `focused`, or `canonical`.
 
 When `implement-next-task` supplies the inputs, use them without asking. When invoked standalone:
 
 1. Ask for `base` if it is absent.
 2. Resolve `spec` from a supplied path, issue reference in commits, or matching plan or spec file.
-3. If no spec exists, skip the Spec lens and report that fact in the final in-context result.
+3. If `change-class` or `validation-tier` is absent, inspect the fixed base and complete current
+   diff, derive both values directly, and fail closed to `mixed` plus `canonical` when ambiguous.
+4. If no spec exists, skip the Spec lens and report that fact in the final result.
 
-## Review loop
+## Review workflow
 
 ### 1. Resolve the diff
 
@@ -38,17 +42,14 @@ git diff <base>...HEAD
 git log <base>..HEAD --oneline
 ```
 
-Stop on a bad base or empty diff. Record the current branch and head SHA so remediation never
-silently changes the review target.
+Stop on a bad base or empty diff. Record the branch and head SHA. Keep the base fixed throughout
+review and remediation.
 
 ### 2. Resolve repository requirements
 
-Invoke `software-repository-guidelines` in `review` mode with the spec, actual diff, repository
-state, supplied implement-mode result, and claimed proof. Select relevant references independently.
-If the skill is unavailable, return a blocker finding instead of skipping it.
-
-Review only current-task requirements and established repository standards. Do not turn unrelated
-repository-health gaps into findings.
+Confirm or derive the change class and validation tier from the actual diff. Do not accept a
+non-coding class when production or test code is present. Review current-task requirements and
+established repository standards only. Report unrelated repository-health problems as out of scope.
 
 ### 3. Decide whether Security runs
 
@@ -59,67 +60,100 @@ file uploads, cryptography, sandboxing, CI trust boundaries, or prompt and guard
 Otherwise skip Security and include `security_status: skipped-no-relevant-surface` in the final
 result. A skip is not a security pass.
 
-### 4. Run independent review lenses
+### 4. Run one independent review panel
 
-Run each active lens in its own agent and require only a JSON Finding array in response.
+For `plan-only` and `documentation-only` work, run Standards and Spec only. Add Bug only when the
+diff contains executable examples, generated navigation, or another behavior-bearing documentation
+surface. For other classes, run Standards, Spec, and Bug. Security remains conditional on the
+surface rules above. Run each active lens in its own subagent and require only a JSON Finding array in
+response.
 
 | Lens | Review target |
 |------|---------------|
-| Standards | Documented repository standards, applicable Software Repository Guidelines, and meaningful tests |
+| Standards | Documented repository standards and meaningful tests |
 | Spec | Missing, partial, incorrect, or out-of-scope behavior against the task or spec |
 | Bug | Correctness, efficiency, and unnecessary complexity through `/code-review` in Claude Code or `/review` in Codex |
 | Security | Exploitable trust-boundary failures through `/security-review` in Claude Code or `$codex-security:security-diff-scan` in Codex |
 
-Tell every review agent to inspect the diff directly, avoid invoking `task-review`, avoid spawning
-more agents, and return findings with concrete evidence. Run the active lenses in parallel when the
+Tell each subagent to inspect the diff directly, avoid invoking any task-review skill, avoid
+spawning more subagents, and return findings with concrete evidence. Run the active lenses in parallel when the
 environment supports it.
 
-### 5. Normalize findings
+This is the only broad panel pass. Do not launch these lenses again during closure.
+
+### 5. Normalize and freeze findings
 
 Dedupe identical findings while retaining every lens that reported them. Reject unsupported claims
-that do not satisfy the Finding schema. Do not down-rank or discard a security finding to keep the
-workflow moving.
-
-Separate the result into:
+that do not satisfy the Finding schema. Separate findings into:
 
 - non-security findings caused by the current diff;
 - security findings;
-- unrelated pre-existing problems, which are reported as out of scope and never fixed here.
+- unrelated pre-existing problems, which remain out of scope.
+
+Assign each accepted finding a stable identifier. Freeze this set before remediation. Targeted
+verification may close or keep these findings open, but it must not become a new broad review.
+
+If a new concern appears during remediation, handle it as follows:
+
+- Fix a failing test or direct regression caused by the remediation inside the same batch.
+- Record an unrelated or minor concern as deferred.
+- Stop and ask the user when the concern is a new blocker, a new major issue, or requires a change
+  to architecture, scope, or a trust boundary.
 
 ### 6. Resolve security findings
 
-Before changing security-sensitive code, handle every new security finding with the user. Invoke
-`write-well` and explain in plain English:
+Before changing security-sensitive code, handle every security finding with the user. Explain in
+plain English:
 
-- what the risk is;
-- how it could occur in a realistic scenario;
-- the likely consequences;
-- how exposed or probable it appears;
-- what a fix would change.
+- the realistic scenario;
+- the likely consequence;
+- the exposure or probability;
+- what the fix would change.
 
 Wait for an explicit decision on each finding:
 
-- **Fix**: add the approved security finding to the remediation set.
+- **Fix**: add the approved finding to the remediation batch.
 - **Accept**: record the user's reason in the local task file when one exists. Without a task file,
-  return the accepted risk to the caller so `create-pr` can include it in the PR `Risk` section.
+  return the accepted risk to the caller for the PR risk section.
 
 Every unresolved security finding blocks completion. An accepted finding remains visible in the
-final result but does not block a later pass when its evidence is unchanged.
+final result.
 
-### 7. Remediate and rereview
+### 7. Remediate once, as one batch
 
-Fix every supported non-security finding attributable to the current diff without prompting the
-user. Also fix security findings the user explicitly approved. Use `tdd` for behavioral defects
-when a testable seam exists. Run the focused tests and checks required by the affected files.
+Fix every supported non-security finding attributable to the current diff and each security finding
+the user approved. Load `tdd` only for defects in production or test code with an observable
+behavioral seam. Never invoke it for plan-only, documentation-only, dependency-only, or declarative
+configuration-only remediation. Group related coding findings into coherent red-green-refactor
+cycles instead of alternating between review and implementation.
 
-Rerun the full applicable panel after remediation. Allow no more than two remediation and rereview
-passes after the initial review.
+The remediation batch may include several edits and test runs. It remains one batch because the
+finding set is fixed and no review lens is rerun.
 
-- If the panel is clean apart from accepted security risks, return success.
-- If a new security finding appears, return to the security decision step.
-- If non-security findings remain after the second remediation pass, stop. Explain what remains,
-  why the loop did not converge, and ask the user how to proceed.
-- If a fix changes the branch head, record the new head SHA in the result.
+Run focused tests and checks for the affected files while remediating. Do not run the full canonical
+suite after each finding.
+
+### 8. Verify the frozen findings
+
+Perform targeted closure verification without spawning the review panel again:
+
+1. For each finding identifier, inspect the changed call site and the evidence that originally
+   supported the finding.
+2. Confirm the original failing scenario is covered by a focused test, static check, or direct diff
+   evidence.
+3. Run the focused test batch once after all remediation is assembled.
+4. Run one final check at the classified validation tier: document/plan consistency for
+   `documentation`, affected dependency or configuration proof for `focused`, and the repository's
+   canonical check for `canonical`.
+5. Mark each finding `fixed`, `accepted-security-risk`, `deferred-out-of-scope`, or `unresolved`.
+
+Do not search untouched parts of the diff for new minor findings during this step. Do not rerun the
+Standards, Spec, Bug, or Security panel.
+
+If targeted verification fails, continue correcting the same frozen findings within the remediation
+batch and rerun only the failed focused proof. If a fix materially changes architecture, scope, or a
+trust boundary, stop and recommend a fresh `task-review` invocation after this one ends. Do not
+start it without user approval.
 
 ## Finding schema
 
@@ -127,6 +161,7 @@ Every finding uses this shape:
 
 ```json
 {
+  "id": "TR-1",
   "axis": "standards | spec | bug | security",
   "severity": "blocker | major | minor | nit",
   "location": "path/to/file.py:42",
@@ -143,46 +178,45 @@ Evidence is mandatory:
 - Bug and Security findings give a concrete input-to-outcome scenario.
 
 Use `blocker` for a must-fix bug, security hole, or missing requirement; `major` for a hard standard
-violation or partial requirement; `minor` for a judgment call; and `nit` for cosmetic issues. All
-supported non-security severities are remediated automatically.
+violation or partial requirement; `minor` for a judgment call; and `nit` for cosmetic issues.
 
 ## Lens briefs
 
 ### Standards
 
-Give the agent the diff command, commits, review-mode repository-guideline result, and repository
-standards files. Ask it to report documented violations, missed current-task requirements, and
-tests that fail to verify real behavior through public interfaces. Skip formatting and other issues
-already enforced by tooling.
+Give the subagent the diff command, commits, and repository standards files. Ask it to report
+documented violations, missed current-task requirements, and tests that fail to verify real behavior
+through public interfaces. Skip formatting and issues already enforced by tooling.
 
 ### Spec
 
-Give the agent the diff command, commits, and spec. Ask it to report missing or partial
-requirements, scope creep, and behavior built incorrectly. Require a quote from the spec for every
-finding.
+Give the subagent the diff command, commits, and spec. Require a quote from the spec for each finding.
+Report missing or partial requirements, scope creep, and incorrect behavior.
 
 ### Bug
 
-Ask the agent to run the environment's code-review capability on the diff. Require concrete failing
-scenarios and stamp `axis: "bug"` on every finding.
+Ask the subagent to run the environment's code-review capability on the diff. Require a concrete
+failing scenario and stamp `axis: "bug"` on each finding.
 
 ### Security
 
-Ask the agent to run the environment's security-review capability on the diff. Require concrete
-attack or misuse scenarios and stamp `axis: "security"` on every finding.
+Ask the subagent to run the environment's security-review capability on the diff. Require a concrete
+attack or misuse scenario and stamp `axis: "security"` on each finding.
 
 ## Final in-context result
 
 Return no document. Return a concise structured result containing:
 
-- base and reviewed head SHA;
+- base and initial reviewed head SHA;
+- remediated head SHA;
 - references and standards checked;
 - security status;
-- findings fixed by axis and severity;
-- remediation-pass count;
-- tests and checks run;
+- the frozen finding set and final status of each finding;
+- one panel pass and one remediation batch;
+- focused proof and final validation command at the classified tier;
 - accepted security risks and user reasons;
-- remaining blockers, if any.
+- deferred concerns and remaining blockers;
+- whether a full review with `task-review` is recommended.
 
-Do not report success while an unresolved security finding or supported non-security finding
-remains.
+Do not report success while a frozen finding remains unresolved or a security finding lacks a user
+decision.

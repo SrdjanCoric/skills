@@ -14,7 +14,6 @@ Accept an optional feature name, an optional managed task path, and optional evi
 `implement-next-task`:
 
 - task-review result;
-- repository-guideline proof;
 - automated and manual verification proof;
 - accepted security risks and the user's reasons.
 
@@ -34,16 +33,23 @@ git status --short
 git diff --cached --stat
 git diff --stat
 git log main..HEAD --oneline || git log origin/main..HEAD --oneline
-git diff main...HEAD || git diff origin/main...HEAD
+git diff --name-status main...HEAD || git diff --name-status origin/main...HEAD
+git diff --stat main...HEAD || git diff --stat origin/main...HEAD
 ```
 
 Confirm the current branch is not `main`. Identify the observable result, dependencies, and
-material risks in the diff.
+material risks in the diff. Inspect the base, current head, staged state, and working tree, then
+classify the complete change as `plan-only`, `documentation-only`, `dependencies`, `configuration`,
+`code`, or `mixed`. Derive the matching validation tier and retain both decisions in working
+context. Fail closed to `mixed` and `canonical` when the classification is ambiguous.
 
-When the caller supplies managed review or repository-guideline evidence, confirm there is no
-unresolved supported finding, security decision, or current-task proof gap. Return to the caller
-when supplied evidence is incomplete. Standalone PR creation does not invent missing managed
-evidence.
+Do not run application lint, typecheck, builds, or tests for plan-only or documentation-only diffs.
+Require `git diff --check` and any repository-provided document, link, or plan consistency check.
+Dependency and configuration diffs use only their affected checks unless mixed with code.
+
+When the caller supplies managed review evidence, confirm there is no unresolved supported
+finding, security decision, or current-task proof gap. Return to the caller when supplied evidence
+is incomplete. Standalone PR creation does not invent missing managed evidence.
 
 ### 2. Stage and commit
 
@@ -93,15 +99,19 @@ the user explicitly chose another branch.
 ### 6. Wait for CI
 
 Wait for all checks on the current head to reach a terminal state. Use
-`gh pr checks <pr> --watch --interval 10` or the repository's documented equivalent. Then confirm:
+`gh pr checks <pr> --watch --interval 10` or the repository's documented equivalent. Then query the
+terminal checks with their start and completion timestamps and confirm:
 
 - the head SHA has not changed;
 - no check is pending or queued;
 - required checks passed;
 - no failure or unexpected cancellation remains.
 
-If the head changes, wait for the new head. If the repository has no CI and no required checks,
-record that state and continue.
+If the head changes, wait for the new head. If the repository has no CI and no required checks, record that state and continue. Never use a
+PR commit `[skip ci]` merely to avoid expensive checks: that can leave the current head without its
+required status. When documentation-only CI is unnecessarily broad, complete the checks the
+repository actually scheduled, record the avoidable wait, and report the repository CI adapter as
+an optimization rather than weakening head-green proof.
 
 ### 7. Finalize a managed task marker
 
@@ -114,8 +124,9 @@ Find the master plan through the most specific `AGENTS.md` `Active plan` entry, 
 
 - If no task matches and no task path was supplied, treat the PR as standalone and continue.
 - If the task pointer is `[~]`, change only that pointer to `[>]`, commit the plan update, and push
-  it. Record that this invocation changed the marker, then return to the CI wait. The marker commit
-  creates a new head, so the earlier green run is stale.
+  it. Reclassify the new head and require `plan-only` with `documentation` validation. Record that
+  this invocation changed the marker, then return to the CI wait. The marker commit creates a new head, so the earlier green run is stale; repository CI
+  should make this rerun lightweight when it supports diff-aware checks.
 - If the pointer is already `[>]`, continue.
 - If the pointer is `[ ]` or `[x]`, stop and report the lifecycle mismatch. Also stop when the task
   path does not match or more than one task matches.
