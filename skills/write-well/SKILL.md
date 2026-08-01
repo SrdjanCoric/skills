@@ -1,6 +1,6 @@
 ---
 name: write-well
-description: Write and revise prose in a direct, human, anti-AI voice. Use whenever you write, draft, rewrite, punch up, or "de-slop" any text. Enforces a clear voice and a strict checklist for stripping the tells that make writing read as machine-generated.
+description: Write and revise prose in a direct, human, anti-AI voice when another workflow explicitly invokes this skill.
 ---
 
 # Writing in a Clear, Human Voice

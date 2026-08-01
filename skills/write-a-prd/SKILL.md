@@ -1,68 +1,127 @@
 ---
 name: write-a-prd
-description: Turn either the current conversation context or a decision document passed in as an argument into a PRD and save it to a local file. Use when the user wants to create a PRD from the current context or from a decision document.
+description: Convert a plan-ready planning brief or completed conversation into a durable PRD while preserving behavioral scenarios, implementation decisions, testing seams, acceptance proof, research evidence, non-goals, and unresolved checkpoints. Use after talk-it-through when a product-facing PRD is useful before to-plan.
 ---
 
-This skill produces a PRD from one of two sources. If a decision document was passed in as an argument, use that document plus the codebase understanding as the source. Otherwise, use the current conversation context plus the codebase understanding. Either way, do NOT interview the user, just synthesize what you already know.
+# Write a PRD
 
-## Argument
+Transform settled planning evidence into a product and implementation specification that a fresh
+`to-plan` session can use without the original conversation. Do not reopen the interview and do not
+invent missing decisions.
 
-An optional argument: the path to a decision document (e.g. a design doc or decisions log). If it's given, that document is the primary source for the PRD. If no argument is given, fall back to the current conversation context.
+## Source
 
-## Process
+Prefer a `write-planning-brief` artifact passed as an argument. Otherwise use a supplied decision
+document or the current completed planning conversation. Read referenced research, design, domain,
+or decision artifacts only where the PRD depends on them. Verify current-state claims against the
+repository when material.
 
-1. Explore the repo to understand the current state of the codebase, if you haven't already.
+If the source is marked `More decisions required`, produce a draft PRD that preserves every
+unresolved checkpoint and mark it `Not ready for to-plan`. Do not hide uncertainty inside prose.
 
-2. Sketch out the major modules you will need to build or modify to complete the implementation. Actively look for opportunities to extract deep modules that can be tested in isolation.
+## Output
 
-A deep module (as opposed to a shallow module) is one which encapsulates a lot of functionality in a simple, testable interface which rarely changes.
+Accept an optional output path. Otherwise use the repository's established PRD convention, then
+`plans/prds/<topic-slug>.md` when `plans/` exists, or `docs/prds/<topic-slug>.md` otherwise. Update an
+existing PRD for the same topic rather than creating a competing source of truth.
 
-Check with the user that these modules match their expectations. Check with the user which modules they want tests written for, and at what boundary.
+Write prose through `write-well` after the factual structure is complete. Style work must not remove
+requirements, qualifications, citations, or uncertainty.
 
-3. Use the template below to write the PRD. Write all of its prose through the `write-well` skill so the final output follows that skill's voice and anti-AI checklist. Save the PRD to a local Markdown file.
+## Required PRD
 
-<prd-template>
+```markdown
+# <Feature>
 
-## Problem Statement
+## PRD status
+Ready for to-plan | Not ready for to-plan
 
-The problem that the user is facing, from the user's perspective.
+## Problem statement
+<The affected actor's problem and consequences.>
 
 ## Solution
+<The resulting capability from the user's perspective.>
 
-The solution to the problem, from the user's perspective.
+## Current state and constraints
+<Relevant verified behavior, compatibility, policy, and environmental constraints.>
 
-## User Stories
+## User stories
+<Numbered user stories covering every material actor and behavior without duplicative filler.>
 
-A LONG, numbered list of user stories. Each user story should be in the format of:
+## Behavioral requirements
+### Happy path
+### Repeat use and idempotency
+### Failure and retry
+### Cancellation, resume, and cleanup
+### Permissions and trust boundaries
+### Relevant edge cases
 
-1. As an <actor>, I want a <feature>, so that <benefit>
+## Acceptance criteria
+- <Observable criterion with an identifiable proof method>
 
-<user-story-example>
-1. As a mobile bank customer, I want to see balance on my accounts, so that I can make better informed decisions about my spending
-</user-story-example>
+## Implementation decisions
+For each settled material decision:
+- **Decision**: <contract, schema, interaction, module boundary, or policy>
+- **Reason**: <decision-relevant rationale>
+- **Important alternatives**: <durable rejected alternatives and decisive reason, or `None recorded`>
+- **Consequences**: <constraint inherited by planning>
 
-This list of user stories should be extremely extensive and cover all aspects of the feature.
+## Domain language
+<Precise project-specific terms whose meaning constrains the work, or `No new domain terms`.>
 
-## Implementation Decisions
+Avoid volatile file paths and implementation snippets unless a decision cannot be represented
+accurately without a small state-machine, schema, reducer, or type shape.
 
-A list of implementation decisions that were made. This can include:
+## Testing decisions
+- **Behavioral test standard**: <public behavior rather than implementation detail>
+- **Primary seams**: <highest stable seam for each behavior group>
+- **Existing precedent**: <repository pattern or source pointer>
+- **Highest-level proof**: <assembled journey, integration, provider, or platform proof>
+- **Manual proof**: <only what cannot be automated, with reason and failure signal>
 
-- The modules that will be built/modified
-- The interfaces of those modules that will be modified
-- Technical clarifications from the developer
-- Architectural decisions
-- Schema changes
-- API contracts
-- Specific interactions
+## State, data, and external dependencies
+<Persistence, ownership, migration, integration, rollout, compatibility, and failure policies.>
 
-Do NOT include specific file paths or code snippets. They may end up being outdated very quickly.
+## Security and human checkpoints
+<Trust-boundary, destructive-data, or unavoidable manual decisions, or `None`.>
 
-## Out of Scope
+## Out of scope
+<Explicit non-goals and adjacent behavior deliberately excluded.>
 
-A description of the things that are out of scope for this PRD.
+## Research evidence
+- [<artifact or primary source>](<path-or-url>) — <decision-relevant conclusion>
 
-## Further Notes
+Use `No external research required` when applicable.
 
-Any further notes about the feature.
+## Unresolved checkpoints
+<Question, consequence, and next decision/evidence step, or `None`.>
 
-</prd-template>
+## Planning constraints
+<Task dependencies, ordering, slicing, rollout, and compatibility constraints inherited by `to-plan`.>
+
+## Further notes
+<Only durable information not represented above.>
+
+## Source coverage
+<Planning brief and authoritative artifacts used.>
+```
+
+## Coverage and readiness audit
+
+Before returning, compare the PRD against the planning brief or conversation and verify:
+
+- every target behavior and actor is represented;
+- happy, repeat, failure, cancellation, resume, cleanup, and edge scenarios are included or marked
+  not applicable with a reason;
+- every settled material decision, important rejected alternative, domain term, planning constraint,
+  and explicit non-goal survived the transformation;
+- testing decisions and highest-level acceptance proof are explicit;
+- research-dependent claims retain claim-level citations or artifact links;
+- security, destructive-data, compatibility, and rollout constraints are not softened;
+- unresolved checkpoints are preserved rather than silently answered;
+- user stories add coverage rather than repetitive volume; and
+- source coverage is complete enough that `to-plan` does not need the original conversation.
+
+Mark `Ready for to-plan` only when no unresolved checkpoint could change behavior, architecture,
+risk, proof, or task boundaries. Return the PRD path, status, unresolved checkpoint count, and
+`/skill:to-plan <prd-path>` when ready.

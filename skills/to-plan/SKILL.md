@@ -33,10 +33,6 @@ Find the master plan through the most specific `AGENTS.md` `Active plan` entry, 
 Inspect the current architecture, domain vocabulary, patterns, integration layers, tests, and
 relevant decision records.
 
-Invoke `software-repository-guidelines` in `scope` mode with the source, repository state, and
-proposed work. Load only relevant references. Map current-task requirements to the task where they
-naturally apply. Do not turn unrelated repository hardening into feature work.
-
 ### 4. Draft the smallest vertical tasks
 
 Break the source into tracer-bullet tasks.
@@ -124,9 +120,6 @@ Each task must contain the relevant source requirements and acceptance criteria 
 implementer does not need the PRD or neighboring tasks. Point to durable decisions instead of
 duplicating them.
 
-For Software Repository Guidelines, name only the relevant reference files, applicable
-requirements, and expected proof.
-
 <task-file-template>
 # Task NNNN: <Title>
 
@@ -137,12 +130,6 @@ requirements, and expected proof.
 ## What to build
 
 <One smallest complete, independently verifiable behavior described end to end.>
-
-## Software Repository Guidelines
-
-**Applicable references**: <only relevant references>
-
-- [ ] <applicable requirement and expected repository, command, or CI proof>
 
 ## Implementation work
 

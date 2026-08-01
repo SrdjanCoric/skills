@@ -102,7 +102,7 @@ If you cannot state the prediction, the hypothesis is a vibe — discard or shar
 
 ### Testing several hypotheses in parallel
 
-When you have several genuinely independent hypotheses, you can test them concurrently — one subagent per hypothesis — instead of sequentially. Each agent changes **its own single variable** against the shared feedback loop and reports pass/fail versus its falsifiable prediction, so they don't confound each other. Collect the verdicts, re-rank, continue.
+When you have several genuinely independent hypotheses, you can test them concurrently, using one isolated subagent per hypothesis, instead of sequentially. Each subagent changes **its own single variable** against the shared feedback loop and reports pass/fail versus its falsifiable prediction, so they don't confound each other. Collect the verdicts, re-rank, continue.
 
 Only parallelise when **all** of these hold:
 
@@ -110,7 +110,7 @@ Only parallelise when **all** of these hold:
 - The feedback loop is fast, deterministic, and **parallel-safe**.
 - Sequential testing would be meaningfully slow.
 
-Use `isolation: 'worktree'` for any agent that **modifies code** to test, or parallel agents mutating the same tree will corrupt each other's results.
+Use a separate worktree for any subagent that **modifies code** to test, or parallel subagents mutating the same tree will corrupt each other's results.
 
 **Stay sequential** when the bug is adaptive (each result reshapes the next hypothesis) or the loop is stateful / can't run concurrently — bisection and delta-debugging are inherently ordered, and forcing parallelism there throws away the signal.
 
