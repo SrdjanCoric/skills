@@ -1,13 +1,21 @@
 ---
 name: implement-next-task
-description: Implement the next eligible local task with TDD, review, validation, documentation, and PR-quality gates while minimizing parent-context growth and avoidable wall time. Use with a task ordinal/path or when asked to build the next task.
+description: Select, claim, and set up the next eligible local task, then implement it through tdd-worker with TDD and focused validation while minimizing parent-context growth and avoidable wall time. Stops before review; the user then runs task-review, review-fix-worker, and finish-task manually.
 ---
 
 # Implement Next Task
 
-Implement one eligible task in full on its feature branch. Use one implementation workflow at a
-time in the current checkout. The master plan controls order and status; the selected task file is
-the contract for what to build.
+Select and implement one eligible task in full on its feature branch, then stop and hand off to the
+manual review loop. Use one implementation workflow at a time in the current checkout. The master
+plan controls order and status; the selected task file is the contract for what to build.
+
+This skill covers selection, setup, and implementation. It does not review, update the README,
+record final completion, or open a PR. When it ends, tell the user to run:
+
+1. `/skill:task-review` — writes a findings file under `reviews/`;
+2. `/skill:review-fix-worker` — fixes the findings one by one;
+3. repeat 1–2 until the review is clean or only accepted/skipped findings remain;
+4. `/skill:finish-task` — README, final proof, completion record, and PR.
 
 Without explicit user approval, modify only repository-scoped files, isolated local/test databases,
 and the task log directory defined below; never run destructive shell commands, access production
@@ -67,14 +75,10 @@ record durable decisions and proof in the task file.
 - [ ] Current code and test reality inspected
 - [ ] Outcome, branch, verification method, and task log directory confirmed
 - [ ] Decisions and unexpected obstacles resolved through `talk-it-through`, or not applicable
-- [ ] `tdd` completed for coding behavior, or correctly skipped for non-coding work
+- [ ] `tdd-worker` completed for coding behavior, or correctly skipped for non-coding work
 - [ ] Implementation work completed within scope
 - [ ] Focused pre-review validation passed
-- [ ] `task-review` completed without unresolved findings and supplied final validation at the classified tier
-- [ ] README inspected after review; `write-well` audit completed only when README prose changed, or no-impact reason recorded
-- [ ] Highest-level automated and required manual proof passed
-- [ ] Task file records implementation, decisions, documentation, review, and proof
-- [ ] User approved PR creation and the current head is CI-green
+- [ ] Manual review-loop handoff (task-review → review-fix-worker → finish-task) reported to the user
 
 ### 1. Select and claim the task
 
@@ -161,9 +165,9 @@ fi
 Retain `TASK_LOG_DIR` in working context. Recompute it with the same commands when needed and pass
 it explicitly to every subagent or child skill that may produce verbose output. Reuse an existing
 directory only when both metadata files exactly match the current repository root and branch;
-otherwise stop rather than writing into it. Keep the directory through implementation, PR creation,
-and CI so failures remain diagnosable. `sync-main` removes it only after successful merge and
-synchronization.
+otherwise stop rather than writing into it. Keep the directory through implementation, the manual
+review loop, PR creation, and CI so failures remain diagnosable. `sync-main` removes it only after
+successful merge and synchronization.
 
 ### 5. Resolve uncertainty and human checkpoints
 
@@ -182,114 +186,36 @@ Resolve declared `[decision]` items through `talk-it-through` before writing cod
 Require explicit approval before `[confirm-db]` work on real, shared, destructive, persistent, or
 ambiguous data and before `[confirm-security]` work that changes a trust boundary. Isolated local
 or test-database work may proceed within the task's scope. Keep `[verify]` items for the final proof
-step.
+step in `finish-task`.
 
-### 6. Implement the task
+### 6. Implement through tdd-worker
 
-Load `tdd` only when the validated classifier result sets `tddApplicable: true` for `code` or
-`mixed` work that changes observable coding behavior, then follow its cost-aware red-green-refactor
-loop. Do not invoke `tdd` for plan-only, documentation-only, dependency-only, or declarative
-configuration-only tasks. Verify those changes with targeted syntax, consistency, security,
-configuration, or provider checks instead. Loading `tdd` alone does not complete a coding step:
-observe RED and GREEN for each coherent behavior
-cycle and retain the command evidence in working context. Implement every item under
-`Implementation work`, follow the architectural decisions, and stay within the selected task.
-Automate any verification that can be automated. Keep coherent bulk documentation, configuration,
-localization, fixture, or workflow edits in one sequential editing pass when they would otherwise
-require many reads and full-file writes. Delegate that pass to one sequential subagent only when isolated editing is available. Pass
-`TASK_LOG_DIR` and a unique, stable log filename for delegated work. The main workflow reviews
-its diff and owns integration decisions.
+Invoke `tdd-worker` with the task-file path, the recorded classification (`change-class`,
+`validation-tier`, `tddApplicable`), the reconnaissance digest, and `TASK_LOG_DIR`. `tdd-worker`
+loads `tdd` when applicable, runs the red-green-refactor loop for every item under the task's
+`Implementation work`, and runs the focused pre-review validation for the recorded tier.
 
-### 7. Verify the implementation
+For plan-only, documentation-only, dependency-only, or declarative configuration-only tasks,
+`tdd-worker` skips `tdd` and verifies changes with targeted syntax, consistency, security,
+configuration, or provider checks instead.
 
-Run validation according to the recorded tier and store verbose output in `TASK_LOG_DIR`:
+When `tdd-worker` returns, confirm its reported evidence: every work item implemented, RED and
+GREEN observed for each coherent behavior cycle, and the tier validation passing. Do not re-run its
+passing validation.
 
-- `documentation`: `git diff --check` plus available document, link, or plan-consistency checks;
-  never lint, typecheck, build, or test the application solely for this class;
-- `focused`: only checks that parse, validate, audit, or exercise the affected dependency or
-  configuration surface;
-- `canonical`: focused tests and affected-area checks while working, with one final canonical
-  validation owned by review.
+### 7. Hand off to the manual review loop
 
-Do not run unchanged canonical full validation repeatedly. Fix current-task gaps and leave
-unrelated repository improvements alone.
+When implementation and focused validation are complete, commit the work on the feature branch and
+stop. Report:
 
-When the diff is stable, inspect `main...HEAD` and the working tree, then classify the actual change
-again and update the validation plan before review. Run independent read-only
-unit/component/lint/typecheck checks only when they do not share mutable state. Isolated subagents may run independent checks in parallel when available. Pass `TASK_LOG_DIR` and a distinct stable log
-filename to each job so parallel commands never write the same file. Each returns command, status,
-duration, failure names, a short relevant excerpt, and log path. Never parallelize database, port, simulator, fixture, or generated
-output checks unless their isolation is proved. Wait for every validation job to finish and resolve
-its failures before invoking `task-review`; validation must never overlap review remediation.
+- the task ordinal, title, and branch;
+- what was built and the proof gathered;
+- deferred decisions or obstacles, if any;
+- the exact next commands: `/skill:task-review`, then `/skill:review-fix-worker`, repeating until
+  clean, then `/skill:finish-task`.
 
-### 8. Run task review
-
-Invoke `task-review` with:
-
-- `base=main`;
-- `spec=` the verbatim task file and referenced decision documents;
-- `task=` the task-file path;
-- `change-class=` the actual diff classification;
-- `validation-tier=` `documentation`, `focused`, or `canonical`.
-
-`task-review` runs the lenses applicable to the change class, batches supported remediation, and
-closes the frozen findings with targeted verification. It does not rerun the full panel after fixes
-and writes no review document.
-
-For every security finding, wait while `task-review` explains the risk and consequences
-plainly. Continue only after the user approves a fix or accepts the risk. Pass accepted risks and
-their reasons to `create-pr`.
-
-If targeted verification recommends a fresh review because remediation materially changed
-architecture, scope, or a trust boundary, stop and ask the user before starting another
-`task-review` invocation.
-
-### 9. Update the README
-
-Inspect the README after task-review remediation, when the implementation has reached its reviewed
-state. When the task changed current application behavior, setup, configuration, or usage, invoke
-`write-well` only for the README update and audit only the affected prose. Complete the skill's full
-audit loop; loading `write-well` alone does not complete this step. Describe the current application,
-not a history of what changed. Record the affected sections and audit pass count in the task file.
-
-Leave the README unchanged when the task has no documentation impact and record that conclusion in
-the task file.
-
-### 10. Prove the final behavior
-
-Treat `task-review`'s post-remediation validation as the workflow's final validation for
-the recorded tier. Do not rerun it. A documentation or focused tier must not be promoted to the
-application's canonical suite without an actual diff reclassification or explicit acceptance
-criterion. Run only the highest-level automated proof not already covered by that check, plus any
-focused check invalidated by a later change. Prefer browser-level proof for
-user-facing behavior and executable scripts or disposable local environments for CLI, API,
-database, and provider workflows.
-
-When automated verification is impossible, give the user exact steps, the expected result, and
-the signal that indicates failure. Explain why the agent cannot perform the check, then wait for
-the user to confirm it passed. Manual verification blocks completion.
-
-### 11. Record completion
-
-Check off the task's implementation work, human checkpoints, and acceptance criteria. Record what
-was built, decisions made, relevant file paths, README disposition, automated proof, manual
-verification, and accepted security risks. Leave the master-plan pointer at `[~]`
-until a PR exists and its CI is green.
-
-### 12. Open the PR after approval
-
-Summarize the completed task and ask the user to approve opening the PR. Do not invoke `create-pr`
-without explicit approval.
-
-After approval, invoke `create-pr` with the task path, task-review result, verification
-proof, and accepted security risks. `create-pr` opens or updates the PR and
-waits for CI. After a green run, it changes the managed task pointer from `[~]` to `[>]` and pushes
-the marker commit. It waits for CI on the new head and does not merge.
-
-Treat PR creation as complete only when `create-pr` returns a CI-green current head and confirms the
-task pointer is `[>]`. Leave the task file under `plans/tasks/`. If PR creation or CI does not
-succeed, the pointer must remain `[~]`. The user invokes `sync-main` separately to merge and close
-the task.
+Do not invoke `task-review`, update the README, run final proof, record completion, or open a PR in
+this skill. Those belong to the manual review loop and `finish-task`.
 
 ## Rules
 
@@ -300,9 +226,8 @@ the task.
 - Stay within the selected task's independently verifiable behavior.
 - Keep the mandatory execution checklist current and report the first unchecked item when blocked.
 - Use `talk-it-through` for unresolved approach decisions and unexpected out-of-task obstacles.
-- Run task-review before the one final README update.
 - Stop for declared decisions, unresolved implementation uncertainty, unexpected out-of-task
-  obstacles, impossible-to-automate verification, destructive database actions, security
-  boundaries, review security findings, and PR approval.
-- Verify completion against the code and observable behavior, not the implementation log.
+  obstacles, destructive database actions, and security boundaries.
+- End after implementation and focused validation; review, README, final proof, completion
+  recording, and PR creation happen in `task-review`, `review-fix-worker`, and `finish-task`.
 - Keep `[>]` distinct from `[x]`; only `sync-main` closes a merged task.

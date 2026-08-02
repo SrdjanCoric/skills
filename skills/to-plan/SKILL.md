@@ -175,10 +175,11 @@ This is the project's local master plan. Task bodies live in `plans/tasks/`; mer
 ## Workflow
 
 - `to-plan` adds approved self-contained task files and pointers.
-- `implement-next-task` takes the first eligible task, claims it as `[~]`, implements it through
-  `tdd`, uses `talk-it-through` when the task or an unexpected obstacle requires a decision,
-  updates the README when the current application state changed, runs `task-review`, proves the
-  behavior, and invokes `create-pr` after user approval.
+- `implement-next-task` takes the first eligible task, claims it as `[~]`, and implements it through
+  `tdd-worker` and `tdd`, using `talk-it-through` when the task or an unexpected obstacle requires a
+  decision. The user then runs `task-review` and `review-fix-worker` manually until the review is
+  clean, and `finish-task` updates the README, proves the behavior, and invokes `create-pr` after
+  user approval.
 - `[ ]` means ready, `[~]` in progress, `[>]` complete with a CI-green PR awaiting merge, and `[x]`
   merged into `main`.
 - `sync-main` verifies and merges the PR, synchronizes local `main`, cleans the merged branch,
