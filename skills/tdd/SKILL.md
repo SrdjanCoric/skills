@@ -1,137 +1,36 @@
 ---
 name: tdd
-description: Cost-aware test-driven development that preserves red-green-refactor quality while grouping related examples into coherent behavior cycles. Use for test-first feature and bug work where repeated test-runner startup or overly granular cycles would add avoidable delay.
+description: Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests.
 ---
 
 # Test-Driven Development
 
-Develop through observed RED-GREEN-REFACTOR cycles without trading away behavior coverage, code
-quality, or final acceptance proof.
+TDD is the red → green loop. This skill is the reference that makes that loop produce tests worth keeping: what a good test is, where tests go, the anti-patterns, and the rules of the loop. Every section applies on every cycle — consult them before and during the loop, not after.
 
-## Core rule
+When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
 
-One cycle proves one coherent observable behavior, not necessarily one test case.
+## What a good test is
 
-Keep behavioral ownership in the main workflow. A read-only subagent may discover test seams or run
-an independent validation command, but it must not decide that a RED or GREEN result proves the next
-behavior. The main workflow observes and interprets each cycle.
+Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't. A good test reads like a specification — "user can checkout with valid cart" tells you exactly what capability exists — and survives refactors because it doesn't care about internal structure.
 
-A cycle may contain one test or a small related matrix when every case exercises the same public
-behavior or production decision. Do not combine unrelated behaviors, write the whole feature's test
-suite before implementation, or remove useful cases to reduce runtime.
+See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
-Tests should verify behavior through public interfaces. Prefer real internal collaborators and mock
-system boundaries when necessary. A mock-call assertion proves wiring, not the capability, and must
-not be the sole proof of cross-module behavior.
+## Seams — where tests go
 
-For critical behavior, a cycle counts only when its proof is sensitive to a plausible defect. Name
-the invariant, likely failure mode, and actors or boundaries needed to produce that failure. Do not
-use null, no-op, or always-successful doubles that make the failure impossible. For asynchronous
-workflows, deterministically exercise meaningful alternative event orderings instead of relying on
-one normal scheduling outcome.
+A **seam** is the public boundary you test at: the interface where you observe behavior without reaching inside. Tests live at seams, never against internals.
 
-## Workflow
+**Test only at pre-agreed seams.** Before writing any test, write down the seams under test and confirm them with the user. No test is written at an unconfirmed seam. You can't test everything — agreeing the seams up front is how testing effort lands on the critical paths and complex logic instead of every edge case.
 
-### 1. Establish the contract
+Ask: "What's the public interface, and which seams should we test?"
 
-Use the caller's approved task, acceptance criteria, and resolved decisions as the behavior contract.
-Ask the user only when a public interface or expected behavior remains genuinely unresolved.
+## Anti-patterns
 
-List observable behaviors and identify the primary test seam for each. For a complete user journey,
-decide whether automated end-to-end testing provides unique, reliable evidence beyond deterministic
-lower-level tests. If it does, name the smallest meaningful end-to-end scenario. If it would only
-duplicate faster proof, is prohibitively slow or flaky, depends on platform behavior that automation
-cannot judge reliably, or cannot force the important failure ordering, name the deterministic
-integration proof and any targeted manual checkpoint instead. Record the reason rather than claiming
-end-to-end coverage.
+- **Implementation-coupled** — mocks internal collaborators, tests private methods, or verifies through a side channel (querying the database instead of using the interface). The tell: the test breaks when you refactor but behavior hasn't changed.
+- **Tautological** — the assertion recomputes the expected value the way the code does (`expect(add(a, b)).toBe(a + b)`, a snapshot derived by hand the same way, a constant asserted equal to itself), so it passes by construction and can never disagree with the code. Expected values must come from an independent source of truth — a known-good literal, a worked example, the spec.
+- **Horizontal slicing** — writing all tests first, then all implementation. Bulk tests verify _imagined_ behavior: you test the _shape_ of things rather than user-facing behavior, the tests go insensitive to real changes, and you commit to test structure before understanding the implementation. Work in **vertical slices** instead — one test → one implementation → repeat, each test a **tracer bullet** that responds to what the last cycle taught you.
 
-If the work exposes unrelated capabilities that cannot be understood as one task, report the scope
-problem to the caller instead of hiding it behind more test cycles.
+## Rules of the loop
 
-### 2. RED for one coherent behavior
-
-Write the smallest test or related test matrix that specifies the next behavior. Run the narrowest
-reliable command once.
-
-Proceed only when:
-
-- the new expectation fails;
-- it fails because the behavior is absent or incorrect, not because of setup, imports, fixtures, or
-  an unrelated failure; and
-- the test observes public behavior rather than implementation structure.
-
-If the new test starts GREEN, determine whether the behavior already exists or the test is
-insensitive. Strengthen or remove the test; do not count it as a cycle.
-
-### 3. GREEN with a general solution
-
-Implement the smallest general solution consistent with the current public contract and known
-domain invariants. Do not hard-code the fixture, special-case the test, anticipate unrelated future
-behaviors, or weaken assertions.
-
-Run the same focused command and observe GREEN.
-
-Before counting a critical cycle complete, confirm test sensitivity using the pre-fix behavior or a
-temporary mutation that represents the likely defect. The relevant expectation must fail for the
-intended reason. If the mutation still passes, strengthen the seam or assertion and repeat RED-GREEN.
-Remove every temporary mutation before continuing.
-
-### 4. Repeat at an economical cadence
-
-Choose execution cadence from feedback-loop cost without changing coverage:
-
-- Keep cheap focused tests granular when that gives clearer feedback.
-- When runner startup dominates, group related examples for the same behavior or use a reliable
-  watch/persistent mode.
-- Do not rerun unchanged broad suites after every small cycle.
-- When the caller supplies a task log directory, keep bounded verbose command output there and do
-  not create a second log location. Otherwise rely on the command runner's bounded output. Return the exit status,
-  duration, relevant failure excerpt, and log path when one exists; inspect full output only when the
-  concise result is insufficient.
-- Run affected feature suites after a connected set of cycles. Reserve one canonical full suite for
-  the final post-remediation validation checkpoint; do not run that unchanged suite both before and
-  after review.
-- Independent read-only checks may run in parallel only after the current diff is stable and only
-  when their runners, ports, databases, fixtures, generated outputs, and simulators are isolated.
-
-A cycle commonly has one to three examples, but semantic cohesion matters more than a numeric cap.
-
-### 5. Refactor while GREEN
-
-Refactor production and test code only while GREEN. Remove duplication, improve names and fixtures,
-deepen shallow interfaces, and replace brittle or mock-heavy proof with a stronger seam where
-appropriate. Preserve every distinct behavior assertion.
-
-Run the focused tests after each refactor step and the affected feature suite when refactoring is
-complete. Batch independent reads, searches, and disjoint test commands in one parent turn to avoid
-unnecessary model round trips, but never batch commands whose result determines the next edit.
-
-### 6. Prove the complete journey at the appropriate seam
-
-When automated end-to-end testing provides unique, reliable evidence for the assembled journey, run
-the smallest named scenario after assembly and again after remediation that could affect it. Do not
-expand E2E coverage merely to duplicate behavior already proved more deterministically at a lower
-seam.
-
-An E2E pass proves only the journey and conditions it exercised. It does not replace deterministic
-proof of concurrency, event ordering, interruption, retries, persistence, or boundary failures. Use
-controlled integration tests for those risks. Use a targeted manual checkpoint when behavior depends
-on human judgment, physical devices, or platform surfaces that automation cannot observe reliably.
-
-If the end-to-end feedback loop fails for an unclear reason, diagnose the loop rather than repeatedly
-patching production code or retrying until it passes. Do not run E2E checks concurrently when they
-share a simulator, server port, fixture, or test account.
-
-## Cycle checklist
-
-- [ ] One coherent observable behavior
-- [ ] Primary test seam is appropriate
-- [ ] RED observed for the intended reason
-- [ ] Critical proof is sensitive to a plausible defect
-- [ ] Relevant actors and boundaries were not mocked into making failure impossible
-- [ ] Smallest general solution implemented
-- [ ] Assertions and coverage were not weakened
-- [ ] GREEN observed with the same focused command
-- [ ] Refactoring performed only while GREEN
-- [ ] Broader validation deferred only to an explicit checkpoint
-- [ ] Complete user journey has the smallest reliable E2E proof when it adds unique value, or documented deterministic and manual proof otherwise
+- **Red before green.** Write the failing test first, then only enough code to pass it. Don't anticipate future tests or add speculative features.
+- **One slice at a time.** One seam, one test, one minimal implementation per cycle.
+- **Refactoring is not part of the loop.** It belongs to the review stage (see the `code-review` skill), not the red → green implementation cycle.

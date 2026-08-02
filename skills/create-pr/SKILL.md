@@ -11,9 +11,9 @@ the current PR head is ready to merge. Do not merge the PR or invoke `sync-main`
 ## Inputs
 
 Accept an optional feature name, an optional managed task path, and optional evidence from
-`implement-next-task`:
+`finish-task`:
 
-- task-review result;
+- task-review and review-fix-worker outcome (fixed findings, skipped minors with reasons);
 - automated and manual verification proof;
 - accepted security risks and the user's reasons.
 
