@@ -29,6 +29,12 @@ log instead of accumulating timestamped copies. Enforce the 5 MiB cap while each
 Never write secrets, credentials, environment contents, source files, or database exports to these
 logs. Preserve current failure evidence until the failure is resolved.
 
+For each RED-GREEN cycle, run the narrowest executable target: one test name when the runner can
+select it reliably, otherwise one test file, otherwise the smallest affected suite. Never run the
+repository's full or canonical test command for an individual finding. Reuse a passing result only
+while its relevant source, tests, configuration, and working-tree state remain unchanged; recording
+or confirming existing proof does not by itself require another test invocation.
+
 ## Workflow
 
 ### 1. Locate and load the review file
@@ -111,8 +117,10 @@ minor/nit). For each finding:
    reproduce the finding as a failing test (RED), fix it (GREEN), refactor. Never invoke `tdd` for
    plan-only, documentation-only, dependency-only, or declarative configuration-only remediation;
    verify those with targeted syntax, consistency, or configuration checks instead.
-3. Run focused tests and checks for the affected files. Do not run the full canonical suite after
-   each finding.
+3. Treat GREEN as the direct proof when it exercises the original failing scenario. Run only
+   additional focused tests or checks needed for neighboring affected behavior that GREEN did not
+   cover. Do not rerun the GREEN command solely as another proof, and do not run the full canonical
+   suite after each finding.
 4. Mark the finding `**Status:** fixed` in the ignored review file immediately, with one short line
    of proof (test name or check), then commit that finding's tracked fix on the review file's branch.
    Never stage the review file. One commit per finding keeps fixes individually revertable, while
@@ -129,12 +137,15 @@ If a new concern appears during remediation:
 
 After all fixable findings are resolved:
 
-1. For each finding identifier, confirm the original failing scenario is covered by a focused test,
-   static check, or direct diff evidence.
-2. Run the focused test batch once after all remediation is assembled.
-3. Run one check at the review file's validation tier: document/plan consistency for
-   `documentation`, affected dependency or configuration proof for `focused`, and focused tests for
-   `canonical` (the one final canonical validation is owned by `finish-task`).
+1. For each finding identifier, confirm from still-valid retained evidence that the original failing
+   scenario is covered by a focused test, static check, or direct diff evidence. Do not rerun a
+   command solely to perform this confirmation.
+2. Form the union of the focused tests and checks affected by all remediation, then run that batch
+   once against the assembled diff.
+3. Treat that batch as the review file's validation-tier check when it satisfies the tier. Run only
+   distinct document/plan consistency or affected dependency/configuration proof that the batch did
+   not already cover. For `canonical`, do not run the focused batch a second time; the one final
+   canonical validation is owned by `finish-task`.
 4. Store verbose output in `TASK_LOG_DIR`.
 
 Do not search untouched parts of the diff for new minor findings. If targeted verification fails,

@@ -197,8 +197,8 @@ violation or partial requirement; `minor` for a judgment call; and `nit` for cos
 ### Standards
 
 Give the subagent the diff command, commits, and repository standards files. Ask it to report
-documented violations, missed current-task requirements, and tests that fail to verify real behavior
-through public interfaces. Skip formatting and issues already enforced by tooling.
+documented violations and tests that fail to verify real behavior through public interfaces. Skip
+formatting and issues already enforced by tooling.
 
 ### Spec
 
