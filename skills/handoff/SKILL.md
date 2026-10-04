@@ -59,7 +59,8 @@ Read the chosen template file before writing, and follow its section set.
   become folders) and `<slug>` derives from the argument
   (`handoffs/feature/synthetic-interview-evals/transcript-reset-bug.md`). Overwrite if it already
   exists.
-- **Ensure `handoffs/` is gitignored** — if the project's `.gitignore` doesn't already ignore it,
-  append `handoffs/`. The handoff is ephemeral, not repo history.
+- **Ensure `handoffs/` is ignored locally** — check `git check-ignore -q handoffs/`; when it is
+  not ignored, append `/handoffs/` to `$(git rev-parse --git-common-dir)/info/exclude`, never to the tracked `.gitignore`. The
+  handoff is ephemeral, not repo history.
 - **Print the path and a ready-to-paste resume line** for the next session, e.g.:
   `Next session: read handoffs/<branch>/<slug>.md and continue.`

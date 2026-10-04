@@ -29,28 +29,56 @@ log instead of accumulating timestamped copies. Enforce the 5 MiB cap while each
 Never write secrets, credentials, environment contents, source files, or database exports to these
 logs. Preserve current failure evidence until the failure is resolved.
 
+## Workflow
+
+### 1. Locate and load the review file
+
 For each RED-GREEN cycle, run the narrowest executable target: one test name when the runner can
 select it reliably, otherwise one test file, otherwise the smallest affected suite. Never run the
 repository's full or canonical test command for an individual finding. Reuse a passing result only
 while its relevant source, tests, configuration, and working-tree state remain unchanged; recording
 or confirming existing proof does not by itself require another test invocation.
 
-## Workflow
+Accept an optional review-file path. Without one, search every checkout attached to this repository,
+the main checkout included — review files are gitignored, so a file written inside a worktree exists
+only there and is invisible from the main checkout:
 
-### 1. Locate and load the review file
+```sh
+# Every reviews/*.md in every checkout attached to this repository, main checkout included.
+git worktree list --porcelain | awk '/^worktree /{ print $2 }' | while read -r wt; do
+  [ -d "$wt" ] || continue
+  find "$wt/reviews" -maxdepth 1 -name '*.md' -print 2>/dev/null
+done
+```
 
-Accept an optional review-file path. Without one, inspect `reviews/` at the repository root:
+Use `find`, not a bare `*.md` glob: under zsh an unmatched glob is an error, so a checkout with no
+`reviews/` directory would abort the search and produce a false "review loop is clean".
+
+Skips worktrees not yet pruned. Key results by absolute path so two checkouts holding same-named
+files stay distinct. The listing is identical from inside a worktree and from the main checkout, and
+a repository with no linked worktrees yields exactly one path — so this collapses to plain
+`reviews/` with no special case. Then select:
 
 - exactly one file with `open` findings → use it;
 - several → prefer the file whose `**Branch:**` matches the current branch; otherwise ask the user
-  which to work on;
+  which to work on, naming the checkout each file came from;
 - none → report that the review loop is clean and suggest `/skill:finish-task`.
 
-Read the whole file. Verify `**Repo:**` matches the current repository root. If the current branch
-differs from `**Branch:**`, check out the named branch when it exists locally; otherwise stop and
+Read the whole file. `**Repo:**` is authoritative. When it names a directory other than the current
+repository root, **switch to that worktree** — `EnterWorktree` with that path when available,
+otherwise supply that directory explicitly on every subsequent command. Never `git checkout` the
+branch to reach it: git refuses to check out a branch already checked out in another worktree, which
+is precisely the case here. Stop and report instead of guessing when the `**Repo:**` directory no
+longer exists, or when `**Branch:**` is checked out in some worktree other than the one `**Repo:**`
+names. Only when `**Repo:**` is the current root does the old rule apply: if the current branch
+differs from `**Branch:**`, check out the named branch when it exists locally, otherwise stop and
 report the mismatch.
 
 ### 2. Establish the task log directory
+
+Do this **after** the worktree switch in step 1, never before. `REPO_ROOT` feeds `REPO_KEY`,
+and inside a worktree `git rev-parse --show-toplevel` resolves to the worktree path — so
+computing it first keys the logs to the wrong checkout.
 
 Recompute the deterministic task log directory and refuse mismatched or symbolic-link paths:
 
@@ -84,7 +112,11 @@ fi
 
 ### 3. Triage before fixing
 
-List every `open` finding with id, axis, severity, and claim. Then, before touching code:
+List every `open` finding with id, axis, severity, and claim. Findings already marked
+`deferred-task-decision` or `deferred-out-of-scope` are not work: list them once under "not in this
+loop" and do not fix them unless the user explicitly reopens one, in which case set it to `open`
+and treat it like any other finding. Findings tagged `Origin: task` are fixed like any other; the
+tag is planning feedback, not an exemption. Then, before touching code:
 
 - **Minor and nit findings:** present them as one list and ask the user which to fix and which to
   skip. For each skip, ask for a one-line reason, set the finding's status to `skipped-minor` with
@@ -110,7 +142,21 @@ List every `open` finding with id, axis, severity, and claim. Then, before touch
 ### 4. Fix findings one by one
 
 Work through the remaining `open` findings in severity order (blocker, major, then approved
-minor/nit). For each finding:
+minor/nit). A fix is judged by the same comment discipline as the original implementation:
+
+Comments in the diff follow one test: a comment earns its place only when it says what the code
+cannot — why this choice over the obvious alternative, an invariant the code depends on, or an
+external constraint such as an API quirk or a production incident. Never narrate what the next
+lines do; if the code needs narration, rename or split it. One home per fact: when the docstring
+explains it, no inline repeat, and the other way round. Inline comments are one line, two at most;
+anything longer belongs in the docstring or the companion doc. Before committing, reread every
+comment in the diff and delete each one that fails this test.
+
+Keep each regression test local to its finding. Prefer an existing narrow test seam. Do not
+expand a shared scenario matrix or build a broader fixture unless the finding cannot be proved
+otherwise; if that is necessary, explain why before doing it.
+
+For each finding:
 
 1. Inspect the cited location and the evidence that originally supported the finding.
 2. Load `tdd` only for defects in production or test code with an observable behavioral seam:
@@ -124,7 +170,10 @@ minor/nit). For each finding:
 4. Mark the finding `**Status:** fixed` in the ignored review file immediately, with one short line
    of proof (test name or check), then commit that finding's tracked fix on the review file's branch.
    Never stage the review file. One commit per finding keeps fixes individually revertable, while
-   the local review file preserves crash- and context-reset recovery state.
+   the local review file preserves crash- and context-reset recovery state. Prefix each of these
+   commits with `HUSKY=0`: the repository hook's full typecheck, lint, and artifact refresh run once
+   in `finish-task`; per-finding they add minutes and no evidence. Never `--no-verify`, never edit
+   the hook.
 
 If a new concern appears during remediation:
 
@@ -161,7 +210,8 @@ no tracked task work remains uncommitted, then return a concise structured resul
 
 - review file path, branch, and head SHA before and after remediation;
 - each finding id with final status: `fixed`, `accepted-security-risk`, `skipped-minor`,
-  `deferred-out-of-scope`, or `unresolved`;
+  `deferred-out-of-scope`, `deferred-task-decision`, or `unresolved`;
+- the review file's planning feedback lines, repeated verbatim, so they reach the next `to-plan`;
 - focused proof and validation commands, status, and log paths;
 - accepted security risks and user reasons;
 - whether a fresh `task-review` is recommended.

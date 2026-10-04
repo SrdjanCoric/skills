@@ -33,6 +33,35 @@ Find the master plan through the most specific `AGENTS.md` `Active plan` entry, 
 Inspect the current architecture, domain vocabulary, patterns, integration layers, tests, and
 relevant decision records.
 
+Before drafting any task that reads or writes existing data, open the schema or model spec of
+every entity the task names and note:
+
+- fields that identify a person, owner, parent, or resource, and whether the same identity is
+  recorded on more than one record (a chat and its trip each carrying an owner);
+- lifecycle flags the selection may need to respect (deleted, deletion requested, archived, demo,
+  test, staff);
+- rough volumes, and any access cost the repository already documents in comments or docs.
+
+Write what you learn as semantics in `What to build` or `Decided` ("the exported user id is the
+chat's owner; a chat owner can differ from the trip owner"; "members who requested deletion are
+excluded") and as landscape in `Context`. Never as steps, field names, or file paths: the task
+tells the implementer what is true and what must hold, not how to get there. The implementer builds
+forward from the task and will not discover a second owner field or a lifecycle flag on its own;
+the reviewer will.
+
+Before naming anything in a task, check it against the base branch:
+
+- **Existence.** Every file, script, command, or skill the task names exists on the base branch
+  (`git ls-tree -r <base>`, not the working tree). Gitignored or local-only tools are named as
+  operator-supplied, never as repository files the implementer can open.
+- **Prior art.** When the task points the implementer at existing code or a prototype to borrow
+  from, state which parts you verified correct and mark the rest "unverified: do not reuse its
+  logic". A `Context` line such as "the prototype already does X" is read as fact and copied,
+  defects included.
+- **External data.** When the task parses another system's data (API payloads, traces, exports),
+  a real anonymised sample must be committed before implementation, or the task opens with a
+  human checkpoint to provide one. Synthetic fixtures only encode the planner's assumptions.
+
 ### 4. Draft the smallest vertical tasks
 
 Break the source into tracer-bullet tasks.
@@ -57,6 +86,142 @@ Break the source into tracer-bullet tasks.
   schema shapes, public contracts, and domain model names.
 
 </vertical-slice-rules>
+
+#### Size gate
+
+Review findings scale with task size, and oversized tasks are where implementers guess and
+reviewers disagree. Before proposing a task, check it against every line below; one failure means
+split again. This is a hard stop: never present or write a task that fails a line. Measure the
+word count with a command over the drafted sections; do not estimate it.
+
+<size-gate>
+
+- The binding sections (`What to build`, `Implementation work`, `Acceptance criteria`) fit in
+  roughly 600 words. Context and rationale live in the non-binding `Context` section and do not
+  count, but a task whose context is longer than its contract is usually two tasks.
+- One primary output: one new command, flow, screen, model, or report. A task that fetches from
+  several sources *and* analyses them *and* adds an optional mode is at least three tasks.
+- At most two external integration points (APIs, services, third-party packages) touched.
+- `Implementation work` has at most eight items, and every item names a behavior the acceptance
+  criteria can observe.
+- Optional flags, alternative modes, and "while we're here" capabilities are not part of the first
+  task. Put them in a follow-up task or in `Non-goals`.
+
+</size-gate>
+
+#### What belongs in a task, and what does not
+
+A task is a contract about observable behavior, not an implementation plan. The implementer does its
+own reconnaissance from the current code; details written into the task go stale, over-constrain
+the implementation, and turn into review findings when the reviewer takes them literally.
+
+<task-detail-rules>
+
+Write these in, precisely:
+
+- observable behavior: inputs, outputs, and the effect on the user or system;
+- public contracts: names of flows, routes, CLI commands and their flags, schema fields, events,
+  environment variables the operator must set;
+- decision semantics: whenever the output is a classification, verdict, status, or score, give a
+  decision table (`conditions → result`) covering every result, including the "cannot decide" case.
+  Every input column of the table needs its own "absent / not present" row: a table that covers
+  "no reply in output" but not "reply present in output, absent from history" is where the
+  implementer guesses and the reviewer files a `major`. When a column identifies a person, owner,
+  or resource (trip owner, chat owner, `resourceId`, uid) and the data reaches that identity by
+  more than one path, the table also needs a row for the paths disagreeing (chat owner differs
+  from trip owner; thread `resourceId` differs from the user id) and names which path is
+  authoritative for every exported or compared field;
+- runtime guarantees the implementation may lean on ("X is always persisted before Y runs"): write
+  them in `Decided` as an explicit assumption with its evidence, never only in `Context`. Context
+  binds nobody, so the implementer cannot rely on it and the reviewer must treat the case as
+  reachable;
+- the data source of every output field or list ("the calls made at step N" says which records
+  they come from), not only identity fields;
+- when behavior must mirror another system ("send what production sends"), the authority to read
+  (a package, module, or service) rather than values transcribed from it. Transcribed values are
+  partial and go stale; the implementer builds them literally. Name the exact file production
+  loads, as a resolved path, and the production call site that uses it, checked by reading that
+  call site: a package can exist twice in `node_modules` (a top-level install and a copy vendored
+  inside another package), and the two can differ in the very behavior the task mirrors. Name what
+  the authority is known not to record, so the implementer supplies it deliberately instead of
+  discovering it at the first live call;
+- edge cases with their expected outcome (missing source, empty input, partial failure);
+- `Non-goals`: adjacent behavior deliberately excluded, so the implementer does not build it and the
+  reviewer does not demand it;
+- `Decided`: durable design constraints the user has already chosen (trust model, data boundaries,
+  what must never happen). Each entry is one line with its reason. Reviewers treat these as
+  accepted, so record only genuine decisions, not preferences;
+- for scripts and tools: who runs it, with what credentials, against what environment, and what it
+  must never do. Reviewers cannot calibrate security severity without this;
+- scale budget and access pattern, in `Decided`, whenever the code reads or writes a shared or
+  production store beyond a handful of documents: the expected volume (rows, documents, chats) with
+  its source, the read shape the implementer must keep (one batched query per table, filter before
+  fetching, skip already-processed items before any remote read), and any index or table the plan
+  knows to be expensive. Without it the implementer writes one query per item and the reviewer
+  files cost findings the task never priced.
+
+Leave these out:
+
+- file paths, function names, and line numbers of existing internals (a public export the task
+  depends on may be named once, without a line number);
+- prescribed cache layouts, paging strategies, data-structure choices, helper reuse, or algorithm
+  steps;
+- test mechanics: which assertion to write, which methods to check for, which property to inspect,
+  which fake to build, how many pages a fake returns, which command to run inside the test.
+  A work item states the guarantee ("the exporter issues no writes to Postgres or Firestore") and
+  names the test file; the implementer chooses the proof. A prescribed assertion shape ("test
+  asserts no write method is reachable") gets built literally and becomes a tautology, and every
+  prescribed mechanic the implementer skips becomes a spec finding that has nothing to do with
+  whether the behavior works. The allowed form is `— proven in <test file>`; a clause that
+  mentions a fake, a fixture shape, a page count, an assertion, or a shell command is struck;
+- lists of data sources or fields to collect that no acceptance criterion consumes;
+- the implementer's future reconnaissance ("X exposes no exports, so do Y");
+- speculative limits, caveats, and follow-ups that are not requirements. State a known limit once,
+  in `Context`, and do not turn it into work.
+
+If a detail is necessary for correctness, it is a contract or a decision: write it in `What to
+build` or `Decided`. If it is merely helpful, it is context: write it in `Context`. If you cannot
+tell, leave it out; the implementer will find it in the code.
+
+</task-detail-rules>
+
+#### Traceability
+
+Every behavior sentence in `What to build` must map to at least one `Implementation work` item and
+one acceptance criterion, and every work item that changes behavior must name the test that proves
+it. The implementer builds from the work items; the reviewer reviews against `What to build`. A
+sentence present in one and absent from the other is exactly where they diverge. Before presenting
+the breakdown, walk `What to build` sentence by sentence and confirm each one is either covered or
+moved to `Context`.
+
+Acceptance criteria must be executable by the implementing agent in the repository with local
+resources, or be declared as a `[verify]` human checkpoint. Do not cite a command or a production
+dataset as a criterion without confirming that the command works on the current base branch and the
+data is reachable without production access.
+
+#### Right-sized engineering
+
+Plan genuinely good code at the smallest size that delivers the source. These rules bar
+unrequested machinery, not craftsmanship: repository conventions, cohesive structure, clear
+naming, real error handling for reachable failures, and tests remain mandatory in every task.
+
+<right-sizing-rules>
+
+- Plan the simplest well-factored design that satisfies the acceptance criteria. Prefer the
+  code's existing structure when the change fits there cohesively; a new module for a genuinely
+  new responsibility is good engineering, not overengineering.
+- Do not plan a new abstraction — interface, base class, wrapper, registry, config option,
+  env var, feature flag — for a single consumer unless it demonstrably improves testability or
+  readability now. Never justify structure by a future the plan does not contain.
+- No speculative generality: no extensibility hooks, no parameterizing what the source treats
+  as fixed, no "while we're here" restructuring.
+- Handle failures the planned code path actually encounters and validate at trust boundaries;
+  that is normal craft. Do not plan recovery machinery — retries, fallbacks, circuit breakers,
+  caching, graceful degradation — unless the source requires it.
+- Phrase implementation work items as behavior, not architecture. A work item that introduces
+  new structure must name the source requirement or concrete design pressure that forces it.
+
+</right-sizing-rules>
 
 #### Wide mechanical refactors
 
@@ -90,7 +255,8 @@ Present every proposed task as a numbered list. For each task show:
 - adjacent behavior deliberately excluded;
 - direct dependencies;
 - automated verification, or the required manual verification;
-- why another split would make the task incomplete.
+- why another split would make the task incomplete;
+- the size-gate result (word count of the binding sections, primary output, integration points).
 
 Ask whether tasks should be split, merged, reordered, or re-scoped. Wait for explicit approval
 before creating or modifying any plan or task file, including when only one task is proposed.
@@ -120,6 +286,11 @@ Each task must contain the relevant source requirements and acceptance criteria 
 implementer does not need the PRD or neighboring tasks. Point to durable decisions instead of
 duplicating them.
 
+The sections `What to build`, `Decided`, `Clarifications`, `Non-goals`, `Implementation work`,
+`Human checkpoints`, and `Acceptance criteria` are **binding**: the implementer builds them and the reviewer reviews
+against them. `Context` is **non-binding**: background, evidence, and known limits that explain
+the task but create no requirement and no finding.
+
 <task-file-template>
 # Task NNNN: <Title>
 
@@ -129,11 +300,32 @@ duplicating them.
 
 ## What to build
 
-<One smallest complete, independently verifiable behavior described end to end.>
+<One smallest complete, independently verifiable behavior described end to end: inputs, outputs,
+effect. For a classification, verdict, or status output, include the decision table.>
+
+## Decided
+
+- <durable constraint the user chose> — <one-line reason>
+- <for scripts/tools: who runs it, with what credentials, against what, and what it must never do>
+
+(Omit when the task carries no decision beyond the master plan's architectural decisions.)
+
+## Clarifications
+
+(Leave empty. `implement-next-task` appends each question the worker had to ask and the user's
+answer here, dated. Entries bind like `Decided`.)
+
+## Non-goals
+
+- <adjacent behavior deliberately excluded, and where it goes if anywhere>
+
+## Context
+
+<Non-binding. Why the task exists, evidence, known limits. No requirements here.>
 
 ## Implementation work
 
-- [ ] <work item>
+- [ ] <work item stated as behavior or guarantee, naming the test file that proves it; never the assertion>
 
 ## Human checkpoints
 
@@ -147,8 +339,19 @@ duplicating them.
 
 ## Acceptance criteria
 
-- [ ] <criterion proving the behavior>
+- [ ] <criterion proving the behavior, runnable by the agent locally, or moved to a [verify] item>
 </task-file-template>
+
+Before writing each file, re-check it against the size gate (measured), the base-branch checks in
+step 3, the task-detail rules, and traceability. Fix the task, not the check. Two checks are
+mechanical and run every time:
+
+- read every `Implementation work` item's test clause; it names a test file and nothing else.
+  Strike any mention of a fake, a fixture shape, a page count, an assertion, or a command;
+- when the user carried planning-feedback lines from a `task-review` result into this pass, each
+  line is either reflected in a binding section of the new task or answered in one sentence in
+  the breakdown. A planning-feedback line that is silently dropped repeats the same review
+  finding on the next task.
 
 ### 8. Append task pointers
 
@@ -182,8 +385,8 @@ This is the project's local master plan. Task bodies live in `plans/tasks/`; mer
   user approval.
 - `[ ]` means ready, `[~]` in progress, `[>]` complete with a CI-green PR awaiting merge, and `[x]`
   merged into `main`.
-- `sync-main` verifies and merges the PR, synchronizes local `main`, cleans the merged branch,
-  changes `[>]` to `[x]`, and moves the task to `tasks/done/`.
+- After the PR merges, the user synchronizes local `main`, cleans the merged branch, changes
+  `[>]` to `[x]`, and moves the task to `tasks/done/`.
 - A task is eligible only when every ordinal in its `(after ...)` list is `[x]`.
 - Run one `implement-next-task` workflow at a time in the current checkout.
 
