@@ -32,7 +32,9 @@ Some topics lean more on knowledge, others more on skills. Theoretical physics i
 
 Write every word the user reads in the `write-well` voice, which is about sounding like one person talking to another instead of like a machine.
 
-**Blocking gate, no exceptions:** before any lesson or reference file reaches the user, you MUST invoke the `write-well` Skill (via the Skill tool) and run its adversarial audit pass over the file you just wrote, fixing what it finds. This applies to every lesson, every follow-up, and every revision, the first one included. "I wrote it in the write-well voice from memory" does NOT satisfy this; the audit is a separate pass you run after drafting. Do not tell the user a lesson is ready, and do not give the open command, until the audit has run and its findings are resolved. If you catch yourself about to ship without having invoked the skill this turn, stop and run it.
+**Blocking gate, no exceptions:** before a lesson HTML file in `./lessons/` reaches the user, you MUST invoke the `write-well` Skill (via the Skill tool) and run its adversarial audit pass over that file, fixing what it finds. This applies to every lesson, every follow-up, and every revision, the first one included. "I wrote it in the write-well voice from memory" does NOT satisfy this; the audit is a separate pass you run after drafting. Do not tell the user a lesson is ready, and do not give the open command, until the audit has run and its findings are resolved. If you catch yourself about to ship without having invoked the skill this turn, stop and run it.
+
+**The gate covers lesson files and nothing else.** `MISSION.md`, `RESOURCES.md`, `NOTES.md`, learning records, reference documents, and any other artefact the workspace produces are working material. Write them clearly and move on. Do not invoke `write-well` for them, and do not hold up a lesson waiting to audit them.
 
 Run the audit because teaching copy is where the machine tells creep in most. The rules in short: no em dashes, lead with the claim instead of warming up to it, cut filler like "Here's the thing" and "it's worth noting", drop tricolons and "not X but Y" reframes, and sound like a capable adult explaining something to another capable adult. When the user gives brand or tone context, match it. When that clashes with the rules, the rules win.
 
@@ -76,7 +78,7 @@ The lesson is the only channel for teaching. Once the workspace is aligned and y
 
 Make opening a lesson as easy as possible, ideally a single CLI command that opens the HTML file in the browser.
 
-Every lesson follows the same fixed sequence, and you do not skip a step: (1) draft the lesson HTML, (2) invoke the `write-well` Skill and run its audit pass over that file, (3) apply the fixes, (4) only then hand the lesson to the user with its open command. Step 2 is mandatory on every single lesson. See the blocking gate in [Voice](#voice).
+Every lesson follows the same fixed sequence, and you do not skip a step: (1) draft the lesson HTML, (2) invoke the `write-well` Skill and run its audit pass over that file, (3) apply the fixes, (4) only then hand the lesson to the user with its open command. Step 2 is mandatory on every single lesson, and it applies to the lesson file only. See the blocking gate in [Voice](#voice).
 
 ## Flagging and follow-up lessons
 

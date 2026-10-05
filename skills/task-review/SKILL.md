@@ -11,8 +11,10 @@ own subagent in parallel. Write every accepted finding to a todo-list file under
 repository. Do not fix findings here: remediation is the manual `review-fix-worker` loop, and a
 clean or fully resolved review unblocks `finish-task`.
 
-Invocation authorizes creating workflow files under `reviews/` and adding the `reviews/` ignore
-entry to `.gitignore` when missing. Never delete or overwrite a review file; `finish-task` removes
+Invocation authorizes creating workflow files under `reviews/` and adding the `/reviews/` ignore
+entry to the repository's local exclude file (`$(git rev-parse --git-common-dir)/info/exclude`) when missing. Never touch the tracked
+`.gitignore` for workflow state: review files, plans, and handoffs are the operator's local
+material, and a `.gitignore` edit would ride into the task's commit. Never delete or overwrite a review file; `finish-task` removes
 all review files for the completed task. Never modify the implementation under review. Never write
 any other review document or create review scaffolding outside `reviews/`.
 
@@ -38,8 +40,25 @@ When invoked standalone:
 
 ### 1. Inspect prior review files
 
-Before reviewing, inspect every `reviews/*.md` file without modifying it. For files whose
-`**Branch:**` matches the current branch:
+Before reviewing, inspect every `reviews/*.md` file without modifying it. Search every checkout
+attached to this repository, the main checkout included — review files are gitignored, so a file
+written inside a worktree exists only there and is invisible from the main checkout:
+
+```sh
+# Every reviews/*.md in every checkout attached to this repository, main checkout included.
+git worktree list --porcelain | awk '/^worktree /{ print $2 }' | while read -r wt; do
+  [ -d "$wt" ] || continue
+  find "$wt/reviews" -maxdepth 1 -name '*.md' -print 2>/dev/null
+done
+```
+
+Use `find`, not a bare `*.md` glob: under zsh an unmatched glob is an error, so a checkout with no
+`reviews/` directory would abort the search and produce a false "review loop is clean".
+
+Skips worktrees not yet pruned. A repository with no linked worktrees yields exactly one path, so
+this collapses to plain `reviews/` with no special case.
+
+For files whose `**Branch:**` matches the branch under review:
 
 - when any finding is `open`, stop, report the file and open finding identifiers, and tell the user
   to run `/skill:review-fix-worker` (or explicitly skip or accept the remaining findings);
@@ -77,10 +96,44 @@ review.
 
 ### 3. Resolve repository requirements
 
+The review runs the task's acceptance commands itself; a review file that says validation "could
+not be re-run" is not finished. When the checkout under review has no installed dependencies
+(a fresh worktree), install them first with the repository's lockfile-frozen install, offline when
+the store allows, and say so. Never substitute the task file's recorded results for a run.
+
 Confirm or derive the change class and validation tier from the actual diff. Do not accept a
 non-coding class when production or test code is present. Review current-task requirements and
 established repository standards only. Report unrelated pre-existing problems as out of scope
-findings and immediately mark them `deferred-out-of-scope`.
+findings and immediately mark them `deferred-out-of-scope`. This includes an acceptance criterion
+that fails on the base branch for reasons the diff did not introduce: check the base before filing,
+and defer rather than open.
+
+Read the task file's sections with their intended weight:
+
+- **Binding** (`What to build`, `Decided`, `Clarifications`, `Non-goals`, `Implementation work`,
+  `Human checkpoints`, `Acceptance criteria`): requirements. Spec findings quote from here only.
+- **`Decided`** and **`Clarifications`**: choices the user already made, with reasons
+  (`Clarifications` holds answers given to the implementer mid-task). A finding that argues against
+  an entry in either is not opened; it is recorded as `deferred-task-decision` with one line saying
+  what the reviewer would have preferred, so the user can reopen the decision if they wish.
+- **`Non-goals`**: excluded behavior. Its absence is never a finding; its presence is scope creep.
+- **`Context`** and anything else: background. It creates no requirement and no finding. A known
+  limit stated in `Context` is not a defect in the diff.
+- **Trust model** (in `Decided`, for scripts and tools): who runs it, with what credentials,
+  against what. Security findings are judged against this model, not against an arbitrary
+  attacker. Where the task gives none, derive the obvious one from the code's location and say so
+  in the file header (`**Trust model (derived):** ...`).
+
+A finding whose failure scenario requires an input shape that the task's `Context` states does not
+occur is graded no higher than `minor` unless the lens shows, from code, that the shape is
+reachable. Tag it `**Origin:** task` and name the decision-table row or `Decided` entry the task
+should have carried. The scenario is still worth fixing when the fix is small, but it is a planning
+gap, not a major defect.
+
+When a finding exists only because the task text prescribed the flawed design (a literal path, a
+data source with no consumer, a wording the implementer copied), keep the finding, and additionally
+tag it `**Origin:** task`. These findings are the planning feedback loop; the implementer should
+not be graded for following the contract.
 
 ### 4. Decide whether Security runs
 
@@ -113,12 +166,52 @@ This is the only broad panel pass. Do not launch these lenses again.
 
 ### 6. Normalize and freeze findings
 
-Dedupe identical findings while retaining every lens that reported them. Reject unsupported claims
-that do not satisfy the Finding schema. Separate findings into:
+Dedupe identical findings while retaining every lens that reported them. Merge findings that share
+one root cause and one fix into a single finding listing every location; twenty entries for five
+defects is friction, not rigor. Reject unsupported claims that do not satisfy the Finding schema.
+Separate findings into:
 
 - non-security findings caused by the current diff;
 - security findings;
+- findings that argue against a `Decided` entry or demand a `Non-goal`, recorded as
+  `deferred-task-decision`;
 - unrelated pre-existing problems, which are recorded as `deferred-out-of-scope`.
+
+Then calibrate severity with the table below. Subagents over-grade; the normalizing pass owns the
+final severity and must lower any finding that does not meet its tier's test.
+
+| Severity | Test |
+|---|---|
+| `blocker` | The primary deliverable gives a wrong result on its main path, a binding acceptance criterion is unmet, or a trust boundary is crossed by someone the trust model does not authorize. |
+| `major` | A binding requirement is partially delivered, or a reachable secondary path gives a wrong result. |
+| `minor` | Judgment calls: unused data, missing docs on exports, hardening beyond what the task asked against a party the trust model names, efficiency with no user-visible cost. |
+| `nit` | A one-line code change that makes the code at that location easier to read. Nothing else is a nit. |
+
+Concretely: a wording defect is never above `minor`; "could be hardened" is never above `minor`
+unless the trust model names the party it defends against; a finding about code the task said to
+write is `Origin: task` and no higher than `major`.
+
+Then cut. These four rules remove findings; they do not lower them. There is no cap on the number
+of findings that survive them.
+
+- **Reachability.** A bug finding's scenario must be reachable with production data and
+  configuration as they exist at review time. When the evidence depends on configuration nobody
+  has set (an empty registry `defaults`, a provider option no agent uses), on data the fixtures
+  and the trace model say does not occur, or when the lens itself calls the scenario latent,
+  unconfirmed, or "no effect today", it is not a finding. Record it as one line under
+  `## Watch list` so a later change can pick it up.
+- **Test coverage.** A missing, weak, or misdirected test is a finding only when that test, had it
+  existed, would have caught a bug this same review found; the finding names that bug's
+  identifier. Every other test-coverage observation is dropped, including a test a work item
+  named. A test clause inside a work item ("unit tests with a fake X returning two pages") is not a
+  requirement; the behavior the item states is.
+- **Trust model.** When the trust model is a single operator running the tool on their own machine
+  with their own credentials, drop every security or hardening scenario whose only victim is that
+  operator. Do not file it as `minor` or `nit`.
+- **Nits.** A nit is a one-line code change that makes the code at that location easier to read.
+  Phrasing that changes no meaning, comment style, commit-message format, changelog spacing, and
+  file layout are not filed at any severity. A document that states something false about the
+  code stays a `minor` standards finding.
 
 Assign each accepted finding a stable identifier. Freeze this set. This skill never remediates, so
 security findings are written as `open` like all others; the user decides fix-or-accept per finding
@@ -126,9 +219,10 @@ inside `review-fix-worker`.
 
 ### 7. Write the review file
 
-Ensure `reviews/` exists at the repository root and is ignored by git: check `.gitignore` for a
-`reviews/` entry and add that single line when missing. If the entry cannot be added, stop and ask
-the user before writing findings.
+Ensure `reviews/` exists at the repository root and is ignored by git: check
+`$(git rev-parse --git-common-dir)/info/exclude` for a `/reviews/` line and append it when missing. The common dir is shared by
+every worktree, so one line covers them all. Never add it to the tracked `.gitignore`. If the entry
+cannot be added, stop and ask the user before writing findings.
 
 Normalize any task path to its repository-relative path. Write one file per review pass. Use
 `reviews/<task-file-stem>-<reviewed-head-short-sha>.md` when a task file exists, otherwise
@@ -148,6 +242,7 @@ other input:
 **Validation tier:** <validation-tier>
 **Created:** <date and time>
 **Lenses:** <lenses run, or "security: skipped-no-relevant-surface">
+**Trust model:** <from the task's Decided section, or "(derived) ...">
 
 ## Findings
 
@@ -160,7 +255,19 @@ other input:
 
 ### TR-2 — minor — standards
 **Status:** open
+**Origin:** task
 ...
+
+## Watch list
+
+<One line per scenario the reachability rule removed: the scenario and what would make it
+reachable. Not work for `review-fix-worker`. Omit the section when empty.>
+
+## Planning feedback
+
+<One line per `Origin: task` and `deferred-task-decision` finding: what in the task text caused it
+and what the task should have said instead. Omit the section when empty. This is the input for the
+next `to-plan` pass, not work for `review-fix-worker`.>
 ```
 
 Never overwrite an existing same-named file. If one exists for the same reviewed head, report that
@@ -189,31 +296,50 @@ Evidence is mandatory:
 - Spec findings quote the task or spec requirement.
 - Bug and Security findings give a concrete input-to-outcome scenario.
 
-Use `blocker` for a must-fix bug, security hole, or missing requirement; `major` for a hard standard
-violation or partial requirement; `minor` for a judgment call; and `nit` for cosmetic issues.
+Severity follows the calibration table in step 6; subagents propose, the normalizing pass decides.
+Optional fields: `"origin": "task"` when the task text prescribed the flawed design.
 
 ## Lens briefs
+
+Give every lens the same framing: the sections of the task that bind, the `Decided` entries and
+trust model, and the `Non-goals`. Tell each lens that `Context` is background, that a `Decided`
+entry is not up for review, and that findings are merged by root cause.
 
 ### Standards
 
 Give the subagent the diff command, commits, and repository standards files. Ask it to report
-documented violations and tests that fail to verify real behavior through public interfaces. Skip
-formatting and issues already enforced by tooling.
+documented violations, missed current-task requirements, and tests that fail to verify real behavior
+through public interfaces. Report a test gap only together with the concrete wrong behavior it
+lets through; a test that is merely absent or merely synthetic is not a finding on its own. Skip
+formatting and issues already enforced by tooling. A standard the
+repository documents but does not enforce anywhere in its own code is `minor`. Never ask for more
+comments. A comment that narrates the code beneath it, or repeats what the docstring already says,
+is a `nit`; a docstring missing on an export is `minor`.
 
 ### Spec
 
-Give the subagent the diff command, commits, and spec. Require a quote from the spec for each finding.
-Report missing or partial requirements, scope creep, and incorrect behavior.
+Give the subagent the diff command, commits, and spec. Require a quote from a binding section for
+each finding. Report missing or partial requirements, scope creep (including capabilities named in
+`Non-goals` or not named anywhere), and incorrect behavior. A quote from `Context` does not support
+a finding. A test clause inside a work item is not a requirement: quote the behavior the item
+states, never the test it names.
 
 ### Bug
 
 Ask the subagent to run the environment's code-review capability on the diff. Require a concrete
-failing scenario and stamp `axis: "bug"` on each finding.
+failing scenario and stamp `axis: "bug"` on each finding. Ask it to rank first any scenario in which
+the deliverable's primary output is wrong on realistic input; those are the findings that matter.
+Ask it to mark `latent` any scenario that needs configuration nobody has set or data the fixtures
+and trace model do not contain, and to say what would make it reachable; the normalizing pass
+moves those to the watch list.
 
 ### Security
 
-Ask the subagent to run the environment's security-review capability on the diff. Require a concrete
-attack or misuse scenario and stamp `axis: "security"` on each finding.
+Ask the subagent to run the environment's security-review capability on the diff, and give it the
+trust model. Require a concrete attack or misuse scenario naming the attacker and the boundary
+crossed, and stamp `axis: "security"` on each finding. A scenario in which the authorized operator
+harms only themselves, or one that requires a boundary the task said would not be defended, is
+not reported; the normalizing pass drops it.
 
 ## Final in-context result
 
@@ -225,7 +351,9 @@ Return a concise structured result containing:
 - the frozen finding set with identifier, axis, and severity;
 - prior review files inspected and retained;
 - the new review file path;
-- deferred out-of-scope concerns;
+- deferred out-of-scope concerns and deferred task decisions;
+- the watch-list lines;
+- the planning feedback lines, so the user can carry them into the next `to-plan` pass;
 - the exact next command: `/skill:review-fix-worker` when any finding is `open`, otherwise
   `/skill:finish-task`.
 
