@@ -59,6 +59,7 @@ implement-next-task → create-pr → sync-main
 - **diagnose**: Works hard bugs and performance regressions through reproduce, minimize, hypothesize, instrument, fix, and regression-test steps.
 - **handoff**: Captures a focused bug, feature pivot, or context slice so a fresh agent can continue without rediscovering the expensive parts.
 - **software-repository-guidelines**: Manually audits repository engineering health and returns evidence-backed hardening recommendations. It is explicit-only and never runs as a routine planning, implementation, review, or PR gate.
+- **things**: Files a bug, improvement, or research item into the Things 3 Work area with a plain-English Claude Doc linked in its notes. It is explicit-only (`/things <what the item is about>`) and needs the Things and Claude Docs connectors.
 - **teach**: Maintains a persistent teaching workspace and produces one focused, interactive HTML lesson at a time, shaped by the learner's feedback.
 - **write-well**: Writes and revises prose in a direct human voice using an adversarial audit for common machine-written patterns.
 
@@ -79,7 +80,7 @@ diagnose            → handoff (when a fresh context is needed)
 
 `task-review` also uses the host environment's code-review capability and, when the diff touches a relevant trust boundary, its security-review capability.
 
-No skill automatically invokes `software-repository-guidelines`. `map-it-out` and `software-repository-guidelines` require explicit manual invocation.
+No skill automatically invokes `software-repository-guidelines`. `map-it-out`, `software-repository-guidelines` and `things` require explicit manual invocation.
 
 `to-plan` names the skills used later in the task lifecycle but does not invoke them while writing the plan. `sync-main` is not an install-time dependency of `implement-next-task`; it is the separately authorized final step that merges the ready PR and closes the task.
 
